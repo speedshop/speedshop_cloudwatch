@@ -30,8 +30,16 @@ end
 This then reports the following metrics:
 
 ```
-TODO: Fill this in based on Puma.stats output
+workers - Number of workers configured (Count)
+booted_workers - Number of workers currently booted (Count)
+old_workers - Number of workers that are old/being phased out (Count)
+running - Number of threads currently running (Count) [per worker]
+backlog - Number of requests in the backlog (Count) [per worker]
+pool_capacity - Current thread pool capacity (Count) [per worker]
+max_threads - Maximum number of threads configured (Count) [per worker]
 ```
+
+Metrics marked [per worker] include a WorkerIndex dimension.
 
 ### Rack Integration
 
@@ -44,7 +52,7 @@ You will need to have a reverse proxy, such as nginx, adding `X-Request-Queue-St
 We report the following metrics:
 
 ```
-TODO: fill in
+request_queue_time - Time spent waiting in the request queue (Milliseconds)
 ```
 
 ### Sidekiq Integration
@@ -60,8 +68,18 @@ If you're using Speedshop with ActiveJob, you should use this integration rather
 We report the following metrics:
 
 ```
-TODO: fill in
+enqueued - Number of jobs currently enqueued (Count)
+processed - Total number of jobs processed (Count)
+failed - Total number of failed jobs (Count)
+scheduled_size - Number of scheduled jobs (Count)
+retry_size - Number of jobs in retry queue (Count)
+dead_size - Number of dead jobs (Count)
+workers_size - Number of Sidekiq workers (Count)
+queue_latency - Latency for each queue (Seconds) [per queue]
+queue_size - Size of each queue (Count) [per queue]
 ```
+
+Metrics marked [per queue] include a QueueName dimension.
 
 ### ActiveJob integration
 
@@ -74,5 +92,8 @@ include Speedshop::Cloudwatch::ActiveJob
 We report the following metrics:
 
 ```
-TODO: fill in
+job_queue_time - Time job spent waiting in queue before execution (Seconds)
+job_execution_time - Time spent executing the job (Seconds)
 ```
+
+Both metrics include JobClass and QueueName dimensions.

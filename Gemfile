@@ -2,10 +2,12 @@
 
 source "https://rubygems.org"
 
-# Specify your gem's dependencies in speedshop-cloudwatch.gemspec
 gemspec
 
 gem "irb"
+gem "minitest"
+gem "puma"
+gem "rack"
 gem "rake", "~> 13.0"
-
+gem "sidekiq"
 gem "standard", "~> 1.3"
