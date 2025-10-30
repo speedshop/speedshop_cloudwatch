@@ -10,36 +10,16 @@ module Speedshop
       def initialize
         @interval = 60
         @client = nil
-        @enabled = {
-          puma: true,
-          sidekiq: true,
-          rack: true,
-          active_job: true
-        }
+        @enabled = {puma: true, sidekiq: true, rack: true, active_job: true}
         @metrics = {
           puma: [:Workers, :BootedWorkers, :OldWorkers, :Running, :Backlog, :PoolCapacity, :MaxThreads],
           sidekiq: [:EnqueuedJobs, :ProcessedJobs, :FailedJobs, :ScheduledJobs, :RetryJobs, :DeadJobs, :Workers, :Processes, :DefaultQueueLatency, :Capacity, :Utilization, :QueueLatency, :QueueSize],
           rack: [:RequestQueueTime],
           active_job: [:JobQueueTime]
         }
-        @namespaces = {
-          puma: "Puma",
-          sidekiq: "Sidekiq",
-          rack: "Rack",
-          active_job: "ActiveJob"
-        }
+        @namespaces = {puma: "Puma", sidekiq: "Sidekiq", rack: "Rack", active_job: "ActiveJob"}
         @sidekiq_queues = nil
-        @logger = default_logger
-      end
-
-      private
-
-      def default_logger
-        if defined?(Rails) && Rails.respond_to?(:logger)
-          Rails.logger
-        else
-          Logger.new($stdout)
-        end
+        @logger = (defined?(Rails) && Rails.respond_to?(:logger)) ? Rails.logger : Logger.new($stdout)
       end
     end
   end

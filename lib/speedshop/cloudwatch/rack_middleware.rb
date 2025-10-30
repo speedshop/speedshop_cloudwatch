@@ -8,28 +8,11 @@ module Speedshop
       end
 
       def call(env)
-        begin
-          queue_start = extract_queue_start(env)
-
-          if queue_start
-            queue_time = (Time.now.to_f * 1000) - queue_start
-            reporter = Speedshop::Cloudwatch.reporter
-            namespace = Speedshop::Cloudwatch.config.namespaces[:rack]
-            reporter.report("RequestQueueTime", queue_time, namespace: namespace, unit: "Milliseconds")
-          end
-        rescue
-        end
-
+        if (header = env["HTTP_X_REQUEST_START"] || env["HTTP_X_QUEUE_START"])
+          queue_time = (Time.now.to_f * 1000) - header.gsub("t=", "").to_f
+          Speedshop::Cloudwatch.reporter.report("RequestQueueTime", queue_time, namespace: Speedshop::Cloudwatch.config.namespaces[:rack], unit: "Milliseconds")
+        end rescue nil
         @app.call(env)
-      end
-
-      private
-
-      def extract_queue_start(env)
-        header = env["HTTP_X_REQUEST_START"] || env["HTTP_X_QUEUE_START"]
-        return nil unless header
-
-        header.gsub("t=", "").to_f
       end
     end
   end

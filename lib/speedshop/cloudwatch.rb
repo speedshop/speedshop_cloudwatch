@@ -15,8 +15,6 @@ module Speedshop
   module Cloudwatch
     class Error < StandardError; end
 
-    @reporter_mutex = Mutex.new
-
     class << self
       def configure
         @config ||= Configuration.new
@@ -29,11 +27,8 @@ module Speedshop
       end
 
       def reporter
-        return @reporter if defined?(@reporter) && @reporter
-
-        @reporter_mutex.synchronize do
-          @reporter = MetricReporter.new(config: config)
-        end
+        return @reporter if @reporter
+        (@reporter_mutex ||= Mutex.new).synchronize { @reporter ||= MetricReporter.new(config: config) }
       end
     end
   end

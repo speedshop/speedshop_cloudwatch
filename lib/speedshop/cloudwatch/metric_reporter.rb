@@ -6,22 +6,18 @@ module Speedshop
       def initialize(config:)
         raise ArgumentError, "CloudWatch client must be provided" unless config.client
         @config = config
-        @thread = nil
-        @pid = nil
-        @running = false
         @mutex = Mutex.new
         @queue = []
         @collectors = []
+        @thread = @pid = nil
+        @running = false
       end
 
       def start!
         @mutex.synchronize do
-          return if running_in_current_process?
-          unless any_integration_enabled?
-            @config.logger.info "Speedshop::Cloudwatch: No integrations enabled, not starting reporter"
-            return
-          end
-          @config.logger.info "Speedshop::Cloudwatch: Starting metric reporter (interval: #{@config.interval}s)"
+          return if @running && @pid == Process.pid
+          return log_info("No integrations enabled, not starting reporter") unless @config.enabled.values.any?
+          log_info("Starting metric reporter (interval: #{@config.interval}s)")
           @pid = Process.pid
           @running = true
           @thread = Thread.new do
@@ -33,107 +29,57 @@ module Speedshop
 
       def stop!
         @mutex.synchronize do
-          @config.logger.info "Speedshop::Cloudwatch: Stopping metric reporter"
+          log_info("Stopping metric reporter")
           @running = false
           @thread&.join
-          @thread = nil
-          @pid = nil
+          @thread = @pid = nil
         end
       end
 
       def report(metric_name, value, namespace:, unit: "None", dimensions: [])
-        return unless metric_enabled?(metric_name, namespace)
+        integration = @config.namespaces.key(namespace)
+        return if integration && (!@config.enabled[integration] || !@config.metrics[integration].include?(metric_name.to_sym))
 
         @mutex.synchronize do
-          @queue << {
-            metric_name: metric_name,
-            value: value,
-            namespace: namespace,
-            unit: unit,
-            dimensions: dimensions,
-            timestamp: Time.now
-          }
+          @queue << {metric_name: metric_name, value: value, namespace: namespace, unit: unit, dimensions: dimensions, timestamp: Time.now}
         end
       end
 
       def register_collector(&block)
-        @mutex.synchronize do
-          @collectors << block
-        end
+        @mutex.synchronize { @collectors << block }
       end
 
       private
 
-      def any_integration_enabled?
-        @config.enabled.values.any?
-      end
-
-      def metric_enabled?(metric_name, namespace)
-        integration = namespace_to_integration(namespace)
-        return true unless integration
-
-        @config.enabled[integration] && @config.metrics[integration].include?(metric_name.to_sym)
-      end
-
-      def namespace_to_integration(namespace)
-        @config.namespaces.each do |integration, ns|
-          return integration if ns == namespace
-        end
-        nil
-      end
-
-      def running_in_current_process?
-        @running && @pid == Process.pid
-      end
-
       def run_loop
         while @running
           sleep @config.interval
-          collect_metrics
+          @collectors.each { |c| c.call rescue log_error("Collector error: #{$!.message}") }
           flush_metrics
         end
       rescue => e
-        @config.logger.error "Speedshop::Cloudwatch: MetricReporter error: #{e.message}"
-        @config.logger.debug e.backtrace.join("\n")
-      end
-
-      def collect_metrics
-        @collectors.each do |collector|
-          collector.call
-        rescue => e
-          @config.logger.error "Speedshop::Cloudwatch: Collector error: #{e.message}"
-          @config.logger.debug e.backtrace.join("\n")
-        end
+        log_error("MetricReporter error: #{e.message}")
       end
 
       def flush_metrics
-        metrics = nil
-        @mutex.synchronize do
-          return if @queue.empty?
-          metrics = @queue.dup
-          @queue.clear
-        end
+        metrics = @mutex.synchronize { @queue.empty? ? nil : @queue.dup.tap { @queue.clear } }
+        return unless metrics
 
-        metrics.group_by { |m| m[:namespace] }.each do |namespace, namespace_metrics|
-          metric_data = namespace_metrics.map do |m|
-            {
-              metric_name: m[:metric_name],
-              value: m[:value],
-              unit: m[:unit],
-              timestamp: m[:timestamp],
-              dimensions: m[:dimensions]
-            }
-          end
-
-          @config.logger.debug "Speedshop::Cloudwatch: Sending #{metric_data.size} metrics to namespace #{namespace}"
-          @config.client.put_metric_data(
-            namespace: namespace,
-            metric_data: metric_data
-          )
+        metrics.group_by { |m| m[:namespace] }.each do |namespace, ns_metrics|
+          @config.logger.debug "Speedshop::Cloudwatch: Sending #{ns_metrics.size} metrics to namespace #{namespace}"
+          @config.client.put_metric_data(namespace: namespace, metric_data: ns_metrics.map { |m| m.slice(:metric_name, :value, :unit, :timestamp, :dimensions) })
         end
       rescue => e
-        @config.logger.error "Speedshop::Cloudwatch: Failed to send metrics: #{e.message}"
-        @config.logger.debug e.backtrace.join("\n")
+        log_error("Failed to send metrics: #{e.message}")
+      end
+
+      def log_info(msg)
+        @config.logger.info "Speedshop::Cloudwatch: #{msg}"
+      end
+
+      def log_error(msg)
+        @config.logger.error "Speedshop::Cloudwatch: #{msg}"
+        @config.logger.debug $!.backtrace.join("\n") if $!
       end
     end
   end
