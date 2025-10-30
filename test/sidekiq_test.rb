@@ -5,15 +5,11 @@ require "sidekiq"
 require "sidekiq/api"
 
 class SidekiqTest < Minitest::Test
-  def teardown
-    Speedshop::Cloudwatch::Sidekiq.stop!
-  end
-
   def test_sidekiq_integration_is_defined
     assert defined?(Speedshop::Cloudwatch::Sidekiq)
   end
 
-  def test_can_start_and_stop
+  def test_can_register_collector
     client = Minitest::Mock.new
 
     stats_mock = Minitest::Mock.new
@@ -30,10 +26,16 @@ class SidekiqTest < Minitest::Test
     queue_mock.expect(:latency, 1.5)
     queue_mock.expect(:size, 20)
 
+    reporter = Speedshop::Cloudwatch::MetricReporter.new(
+      config: Speedshop::Cloudwatch::Configuration.new.tap do |c|
+        c.client = client
+        c.interval = 60
+      end
+    )
+
     ::Sidekiq::Stats.stub(:new, stats_mock) do
       ::Sidekiq::Queue.stub(:all, [queue_mock]) do
-        Speedshop::Cloudwatch::Sidekiq.start!(interval: 60, client: client)
-        Speedshop::Cloudwatch::Sidekiq.stop!
+        Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter)
       end
     end
   end

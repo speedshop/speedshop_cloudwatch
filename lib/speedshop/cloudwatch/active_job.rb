@@ -16,20 +16,16 @@ module Speedshop
         yield
 
         if enqueued_at
-          queue_time = start_time - enqueued_at
-          reporter.report("job_queue_time", queue_time, unit: "Seconds", dimensions: job_dimensions)
+          queue_time = start_time.to_f - enqueued_at
+          report("job_queue_time", queue_time, namespace: "ActiveJob", unit: "Seconds", dimensions: job_dimensions)
         end
 
         execution_time = Time.now - start_time
-        reporter.report("job_execution_time", execution_time, unit: "Seconds", dimensions: job_dimensions)
+        report("job_execution_time", execution_time, namespace: "ActiveJob", unit: "Seconds", dimensions: job_dimensions)
       end
 
-      def reporter
-        @reporter ||= begin
-          r = MetricReporter.new(namespace: "ActiveJob", interval: 60)
-          r.start!
-          r
-        end
+      def report(*args, **kwargs)
+        Cloudwatch.reporter.report(*args, **kwargs)
       end
 
       def job_dimensions

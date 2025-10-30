@@ -12,7 +12,7 @@ Gem::Specification.new do |spec|
   spec.description = "This gem helps integrate your Ruby application with AWS Cloudwatch, reporting metrics from Puma, Rack, Sidekiq, and ActiveJob in background threads to avoid adding latency to requests and jobs."
   spec.homepage = "https://github.com/nateberkopec/speedshop-cloudwatch"
   spec.license = "MIT"
-  spec.required_ruby_version = ">= 3.0.0"
+  spec.required_ruby_version = ">= 2.7.0"
 
   spec.metadata["allowed_push_host"] = "TODO: Set to your gem server 'https://example.com'"
   spec.metadata["homepage_uri"] = spec.homepage

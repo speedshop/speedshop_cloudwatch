@@ -1,16 +1,38 @@
 # frozen_string_literal: true
 
 require "aws-sdk-cloudwatch"
+require "singleton"
+require "speedshop/cloudwatch/active_job"
+require "speedshop/cloudwatch/configuration"
+require "speedshop/cloudwatch/metric_reporter"
+require "speedshop/cloudwatch/puma"
+require "speedshop/cloudwatch/rack_middleware"
+require "speedshop/cloudwatch/railtie" if defined?(Rails::Railtie)
+require "speedshop/cloudwatch/sidekiq"
+require "speedshop/cloudwatch/version"
 
 module Speedshop
   module Cloudwatch
     class Error < StandardError; end
+
+    @reporter_mutex = Mutex.new
+
+    class << self
+      def configure
+        @config ||= Configuration.new
+        yield @config if block_given?
+        @config
+      end
+
+      def config
+        @config ||= Configuration.new
+      end
+
+      def reporter
+        @reporter_mutex.synchronize do
+          @reporter ||= MetricReporter.new(config: config)
+        end
+      end
+    end
   end
 end
-
-require_relative "cloudwatch/active_job"
-require_relative "cloudwatch/metric_reporter"
-require_relative "cloudwatch/puma"
-require_relative "cloudwatch/rack_middleware"
-require_relative "cloudwatch/sidekiq"
-require_relative "cloudwatch/version"

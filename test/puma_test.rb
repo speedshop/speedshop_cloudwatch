@@ -4,15 +4,11 @@ require "test_helper"
 require "puma"
 
 class PumaTest < Minitest::Test
-  def teardown
-    Speedshop::Cloudwatch::Puma.stop!
-  end
-
   def test_puma_integration_is_defined
     assert defined?(Speedshop::Cloudwatch::Puma)
   end
 
-  def test_can_start_and_stop
+  def test_can_register_collector
     client = Minitest::Mock.new
 
     stub_puma_stats = {
@@ -25,9 +21,15 @@ class PumaTest < Minitest::Test
       max_threads: 5
     }
 
+    reporter = Speedshop::Cloudwatch::MetricReporter.new(
+      config: Speedshop::Cloudwatch::Configuration.new.tap do |c|
+        c.client = client
+        c.interval = 60
+      end
+    )
+
     ::Puma.stub(:stats_hash, stub_puma_stats) do
-      Speedshop::Cloudwatch::Puma.start!(interval: 60, client: client)
-      Speedshop::Cloudwatch::Puma.stop!
+      Speedshop::Cloudwatch::Puma.register(namespace: "Puma", reporter: reporter)
     end
   end
 end
