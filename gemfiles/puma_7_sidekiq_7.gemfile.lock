@@ -112,6 +112,7 @@ GEM
 PLATFORMS
   arm64-darwin-24
   ruby
+  x86_64-linux
 
 DEPENDENCIES
   irb
@@ -124,4 +125,4 @@ DEPENDENCIES
   standard (>= 1.35.1)
 
 BUNDLED WITH
-   2.7.1
+   2.4.12
