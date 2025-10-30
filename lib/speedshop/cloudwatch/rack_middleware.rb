@@ -15,7 +15,7 @@ module Speedshop
             queue_time = (Time.now.to_f * 1000) - queue_start
             reporter = Speedshop::Cloudwatch.reporter
             namespace = Speedshop::Cloudwatch.config.namespaces[:rack]
-            reporter.report("request_queue_time", queue_time, namespace: namespace, unit: "Milliseconds")
+            reporter.report("RequestQueueTime", queue_time, namespace: namespace, unit: "Milliseconds")
           end
         rescue
         end

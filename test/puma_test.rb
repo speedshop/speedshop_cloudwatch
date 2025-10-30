@@ -41,13 +41,13 @@ class PumaTest < Minitest::Test
     end
 
     metric_names = metrics_collected.map { |m| m[:name] }
-    assert_includes metric_names, "workers"
-    assert_includes metric_names, "booted_workers"
-    assert_includes metric_names, "old_workers"
-    assert_includes metric_names, "running"
-    assert_includes metric_names, "backlog"
-    assert_includes metric_names, "pool_capacity"
-    assert_includes metric_names, "max_threads"
+    assert_includes metric_names, "Workers"
+    assert_includes metric_names, "BootedWorkers"
+    assert_includes metric_names, "OldWorkers"
+    assert_includes metric_names, "Running"
+    assert_includes metric_names, "Backlog"
+    assert_includes metric_names, "PoolCapacity"
+    assert_includes metric_names, "MaxThreads"
   end
 
   def test_collects_metrics_with_clustered_mode_stats
@@ -97,15 +97,15 @@ class PumaTest < Minitest::Test
     end
 
     metric_names = metrics_collected.map { |m| m[:name] }
-    assert_includes metric_names, "workers"
-    assert_includes metric_names, "booted_workers"
-    assert_includes metric_names, "old_workers"
-    assert_includes metric_names, "running"
-    assert_includes metric_names, "backlog"
-    assert_includes metric_names, "pool_capacity"
-    assert_includes metric_names, "max_threads"
+    assert_includes metric_names, "Workers"
+    assert_includes metric_names, "BootedWorkers"
+    assert_includes metric_names, "OldWorkers"
+    assert_includes metric_names, "Running"
+    assert_includes metric_names, "Backlog"
+    assert_includes metric_names, "PoolCapacity"
+    assert_includes metric_names, "MaxThreads"
 
-    running_metrics = metrics_collected.select { |m| m[:name] == "running" }
+    running_metrics = metrics_collected.select { |m| m[:name] == "Running" }
     assert_equal 2, running_metrics.size
 
     worker_0_metrics = metrics_collected.select do |m|

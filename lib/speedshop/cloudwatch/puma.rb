@@ -23,9 +23,9 @@ module Speedshop
         end
 
         def report_stats(stats)
-          @reporter.report("workers", stats[:workers] || 0, namespace: @namespace, unit: "Count")
-          @reporter.report("booted_workers", stats[:booted_workers] || 0, namespace: @namespace, unit: "Count")
-          @reporter.report("old_workers", stats[:old_workers] || 0, namespace: @namespace, unit: "Count")
+          @reporter.report("Workers", stats[:workers] || 0, namespace: @namespace, unit: "Count")
+          @reporter.report("BootedWorkers", stats[:booted_workers] || 0, namespace: @namespace, unit: "Count")
+          @reporter.report("OldWorkers", stats[:old_workers] || 0, namespace: @namespace, unit: "Count")
 
           if stats[:worker_status]
             stats[:worker_status].each_with_index do |worker, idx|
@@ -40,10 +40,10 @@ module Speedshop
         def report_worker_stats(worker_stats, worker_idx)
           dimensions = [{name: "WorkerIndex", value: worker_idx.to_s}]
 
-          @reporter.report("running", worker_stats[:running] || 0, namespace: @namespace, unit: "Count", dimensions: dimensions)
-          @reporter.report("backlog", worker_stats[:backlog] || 0, namespace: @namespace, unit: "Count", dimensions: dimensions)
-          @reporter.report("pool_capacity", worker_stats[:pool_capacity] || 0, namespace: @namespace, unit: "Count", dimensions: dimensions)
-          @reporter.report("max_threads", worker_stats[:max_threads] || 0, namespace: @namespace, unit: "Count", dimensions: dimensions)
+          @reporter.report("Running", worker_stats[:running] || 0, namespace: @namespace, unit: "Count", dimensions: dimensions)
+          @reporter.report("Backlog", worker_stats[:backlog] || 0, namespace: @namespace, unit: "Count", dimensions: dimensions)
+          @reporter.report("PoolCapacity", worker_stats[:pool_capacity] || 0, namespace: @namespace, unit: "Count", dimensions: dimensions)
+          @reporter.report("MaxThreads", worker_stats[:max_threads] || 0, namespace: @namespace, unit: "Count", dimensions: dimensions)
         end
       end
     end

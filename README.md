@@ -43,7 +43,7 @@ Speedshop::Cloudwatch.configure do |config|
   config.enabled[:rack] = false
 
   # Customize which metrics to report (whitelist)
-  config.metrics[:puma] = [:workers, :booted_workers, :running, :backlog]
+  config.metrics[:puma] = [:Workers, :BootedWorkers, :Running, :Backlog]
   config.metrics[:sidekiq] = [:EnqueuedJobs, :QueueLatency, :QueueSize]
 
   # Customize which Sidekiq queues to monitor (all queues by default)
@@ -63,7 +63,7 @@ If not configured, all metrics are enabled by default. Here are the default metr
 
 **Puma:**
 ```ruby
-config.metrics[:puma] = [:workers, :booted_workers, :old_workers, :running, :backlog, :pool_capacity, :max_threads]
+config.metrics[:puma] = [:Workers, :BootedWorkers, :OldWorkers, :Running, :Backlog, :PoolCapacity, :MaxThreads]
 ```
 
 **Sidekiq:**
@@ -73,12 +73,12 @@ config.metrics[:sidekiq] = [:EnqueuedJobs, :ProcessedJobs, :FailedJobs, :Schedul
 
 **Rack:**
 ```ruby
-config.metrics[:rack] = [:request_queue_time]
+config.metrics[:rack] = [:RequestQueueTime]
 ```
 
 **ActiveJob:**
 ```ruby
-config.metrics[:active_job] = [:job_queue_time]
+config.metrics[:active_job] = [:JobQueueTime]
 ```
 
 ### Puma Integration
@@ -94,13 +94,13 @@ end
 This then reports the following metrics:
 
 ```
-workers - Number of workers configured (Count)
-booted_workers - Number of workers currently booted (Count)
-old_workers - Number of workers that are old/being phased out (Count)
-running - Number of threads currently running (Count) [per worker]
-backlog - Number of requests in the backlog (Count) [per worker]
-pool_capacity - Current thread pool capacity (Count) [per worker]
-max_threads - Maximum number of threads configured (Count) [per worker]
+Workers - Number of workers configured (Count)
+BootedWorkers - Number of workers currently booted (Count)
+OldWorkers - Number of workers that are old/being phased out (Count)
+Running - Number of threads currently running (Count) [per worker]
+Backlog - Number of requests in the backlog (Count) [per worker]
+PoolCapacity - Current thread pool capacity (Count) [per worker]
+MaxThreads - Maximum number of threads configured (Count) [per worker]
 ```
 
 Metrics marked [per worker] include a WorkerIndex dimension.
@@ -116,7 +116,7 @@ You will need to have a reverse proxy, such as nginx, adding `X-Request-Queue-St
 We report the following metrics:
 
 ```
-request_queue_time - Time spent waiting in the request queue (Milliseconds)
+RequestQueueTime - Time spent waiting in the request queue (Milliseconds)
 ```
 
 ### Sidekiq Integration
@@ -163,7 +163,7 @@ include Speedshop::Cloudwatch::ActiveJob
 We report the following metrics:
 
 ```
-job_queue_time - Time job spent waiting in queue before execution (Seconds)
+JobQueueTime - Time job spent waiting in queue before execution (Seconds)
 ```
 
 This metric includes JobClass and QueueName dimensions.

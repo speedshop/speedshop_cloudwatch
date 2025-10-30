@@ -17,10 +17,10 @@ module Speedshop
           active_job: true
         }
         @metrics = {
-          puma: [:workers, :booted_workers, :old_workers, :running, :backlog, :pool_capacity, :max_threads],
+          puma: [:Workers, :BootedWorkers, :OldWorkers, :Running, :Backlog, :PoolCapacity, :MaxThreads],
           sidekiq: [:EnqueuedJobs, :ProcessedJobs, :FailedJobs, :ScheduledJobs, :RetryJobs, :DeadJobs, :Workers, :Processes, :DefaultQueueLatency, :Capacity, :Utilization, :QueueLatency, :QueueSize],
-          rack: [:request_queue_time],
-          active_job: [:job_queue_time]
+          rack: [:RequestQueueTime],
+          active_job: [:JobQueueTime]
         }
         @namespaces = {
           puma: "Puma",
