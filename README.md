@@ -27,6 +27,18 @@ This gem tracks queue depths, latencies, and resource utilization - metrics that
 gem `speedshop_cloudwatch`
 ```
 
+## Version Support
+
+This gem supports:
+
+- **Ruby**: 2.7, 3.0, 3.1, 3.2, 3.3, 3.4
+- **Puma**: 6.x, 7.x
+- **Sidekiq**: 7.x, 8.x
+
+Note: Some combinations have minimum Ruby requirements:
+- Puma 7.x requires Ruby 3.0+
+- Sidekiq 8.x requires Ruby 3.2+
+
 ## Configuration
 
 You can configure which integrations are enabled, which metrics are reported, and the CloudWatch namespace for each integration:
