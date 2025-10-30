@@ -15,10 +15,6 @@ class MetricReporterTest < Minitest::Test
     @reporter&.stop!
   end
 
-  def test_can_initialize_reporter
-    assert_equal 60, @reporter.interval
-  end
-
   def test_queues_metrics
     @reporter.report("test_metric", 42, namespace: "TestApp")
     @reporter.report("another_metric", 100, namespace: "TestApp", unit: "Count")

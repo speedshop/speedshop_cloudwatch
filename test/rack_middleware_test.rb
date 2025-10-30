@@ -7,6 +7,11 @@ class RackMiddlewareTest < Minitest::Test
   def setup
     @app = ->(env) { [200, {}, ["OK"]] }
     @client = Minitest::Mock.new
+
+    Speedshop::Cloudwatch.configure do |config|
+      config.client = @client
+      config.interval = 60
+    end
   end
 
   def teardown
@@ -14,7 +19,7 @@ class RackMiddlewareTest < Minitest::Test
   end
 
   def test_processes_request_with_x_request_start
-    @middleware = Speedshop::Cloudwatch::RackMiddleware.new(@app, client: @client)
+    @middleware = Speedshop::Cloudwatch::RackMiddleware.new(@app)
 
     queue_start = (Time.now.to_f * 1000) - 100
     env = {"HTTP_X_REQUEST_START" => "t=#{queue_start}"}
@@ -24,7 +29,7 @@ class RackMiddlewareTest < Minitest::Test
   end
 
   def test_processes_request_with_x_queue_start
-    @middleware = Speedshop::Cloudwatch::RackMiddleware.new(@app, client: @client)
+    @middleware = Speedshop::Cloudwatch::RackMiddleware.new(@app)
 
     queue_start = (Time.now.to_f * 1000) - 100
     env = {"HTTP_X_QUEUE_START" => "t=#{queue_start}"}
@@ -34,7 +39,7 @@ class RackMiddlewareTest < Minitest::Test
   end
 
   def test_handles_missing_queue_header
-    @middleware = Speedshop::Cloudwatch::RackMiddleware.new(@app, client: @client)
+    @middleware = Speedshop::Cloudwatch::RackMiddleware.new(@app)
 
     env = {}
     status, _headers, _body = @middleware.call(env)

@@ -3,13 +3,8 @@
 module Speedshop
   module Cloudwatch
     class RackMiddleware
-      def initialize(app, namespace: "Rack", client: nil)
+      def initialize(app)
         @app = app
-        @namespace = namespace
-        Speedshop::Cloudwatch.configure do |config|
-          config.client = client if client
-        end
-        @reporter = Speedshop::Cloudwatch.reporter
       end
 
       def call(env)
@@ -19,7 +14,9 @@ module Speedshop
 
         if queue_start
           queue_time = (Time.now.to_f * 1000) - queue_start
-          @reporter.report("request_queue_time", queue_time, namespace: @namespace, unit: "Milliseconds")
+          reporter = Speedshop::Cloudwatch.reporter
+          namespace = "Rack"
+          reporter.report("request_queue_time", queue_time, namespace: namespace, unit: "Milliseconds")
         end
 
         [status, headers, body]

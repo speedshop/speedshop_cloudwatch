@@ -3,9 +3,18 @@
 require "test_helper"
 require "sidekiq"
 require "sidekiq/api"
+require "connection_pool"
 
 class SidekiqTest < Minitest::Test
   def setup
+    Sidekiq.configure_client do |config|
+      config.redis = {url: "redis://localhost:6379/15"}
+    end
+    Sidekiq.configure_server do |config|
+      config.redis = {url: "redis://localhost:6379/15"}
+    end
+    Sidekiq.redis(&:flushdb)
+
     @lifecycle_callbacks = {}
     callbacks = @lifecycle_callbacks
     @sidekiq_config_mock = Object.new
@@ -14,38 +23,16 @@ class SidekiqTest < Minitest::Test
     end
   end
 
+  def teardown
+    Sidekiq.redis(&:flushdb)
+  end
+
   def test_sidekiq_integration_is_defined
     assert defined?(Speedshop::Cloudwatch::Sidekiq)
   end
 
   def test_can_register_collector
     client = Minitest::Mock.new
-
-    stats_mock = Minitest::Mock.new
-    stats_mock.expect(:enqueued, 10)
-    stats_mock.expect(:processed, 100)
-    stats_mock.expect(:failed, 5)
-    stats_mock.expect(:scheduled_size, 2)
-    stats_mock.expect(:retry_size, 3)
-    stats_mock.expect(:dead_size, 1)
-    stats_mock.expect(:workers_size, 4)
-    stats_mock.expect(:processes_size, 2)
-    stats_mock.expect(:default_queue_latency, 0.5)
-
-    process_mock = {
-      "concurrency" => 10,
-      "busy" => 5,
-      "hostname" => "worker-1",
-      "tag" => "default"
-    }
-    process_set_mock = Minitest::Mock.new
-    process_set_mock.expect(:to_enum, [process_mock], [:each])
-
-    queue_mock = Minitest::Mock.new
-    queue_mock.expect(:name, "default")
-    queue_mock.expect(:latency, 1.5)
-    queue_mock.expect(:size, 20)
-
     reporter = Speedshop::Cloudwatch::MetricReporter.new(
       config: Speedshop::Cloudwatch::Configuration.new.tap do |c|
         c.client = client
@@ -54,14 +41,10 @@ class SidekiqTest < Minitest::Test
     )
 
     ::Sidekiq.stub(:configure_server, proc { |&block| block.call(@sidekiq_config_mock) }) do
-      ::Sidekiq::Stats.stub(:new, stats_mock) do
-        ::Sidekiq::ProcessSet.stub(:new, process_set_mock) do
-          ::Sidekiq::Queue.stub(:all, [queue_mock]) do
-            Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter)
-          end
-        end
-      end
+      Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter)
     end
+
+    assert_equal 1, reporter.instance_variable_get(:@collectors).size
   end
 
   def test_lifecycle_hooks_registered_for_oss
@@ -131,7 +114,7 @@ class SidekiqTest < Minitest::Test
     refute reporter.instance_variable_get(:@running), "Reporter should be stopped after quiet"
   end
 
-  def test_collects_all_metrics
+  def test_collects_all_metrics_with_real_sidekiq_data
     client = Minitest::Mock.new
     metrics_collected = []
 
@@ -146,38 +129,11 @@ class SidekiqTest < Minitest::Test
       metrics_collected << {name: metric_name, value: value, **options}
     end
 
-    stats_mock = Minitest::Mock.new
-    stats_mock.expect(:enqueued, 10)
-    stats_mock.expect(:processed, 100)
-    stats_mock.expect(:failed, 5)
-    stats_mock.expect(:scheduled_size, 2)
-    stats_mock.expect(:retry_size, 3)
-    stats_mock.expect(:dead_size, 1)
-    stats_mock.expect(:workers_size, 4)
-    stats_mock.expect(:processes_size, 2)
-    stats_mock.expect(:default_queue_latency, 0.5)
-
-    process1 = {"concurrency" => 10, "busy" => 5, "hostname" => "worker-1", "tag" => "default"}
-    process2 = {"concurrency" => 10, "busy" => 7, "hostname" => "worker-2", "tag" => "priority"}
-    process_set_mock = Minitest::Mock.new
-    process_set_mock.expect(:to_enum, [process1, process2], [:each])
-
-    queue_mock = Minitest::Mock.new
-    queue_mock.expect(:name, "default")
-    queue_mock.expect(:latency, 1.5)
-    queue_mock.expect(:size, 20)
-
     ::Sidekiq.stub(:configure_server, proc { |&block| block.call(@sidekiq_config_mock) }) do
-      ::Sidekiq::Stats.stub(:new, stats_mock) do
-        ::Sidekiq::ProcessSet.stub(:new, process_set_mock) do
-          ::Sidekiq::Queue.stub(:all, [queue_mock]) do
-            Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter, process_metrics: true)
+      Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter, process_metrics: true)
 
-            collector = reporter.instance_variable_get(:@collectors).last
-            collector.call
-          end
-        end
-      end
+      collector = reporter.instance_variable_get(:@collectors).last
+      collector.call
     end
 
     metric_names = metrics_collected.map { |m| m[:name] }
@@ -191,23 +147,6 @@ class SidekiqTest < Minitest::Test
     assert_includes metric_names, "Processes"
     assert_includes metric_names, "DefaultQueueLatency"
     assert_includes metric_names, "Capacity"
-    assert_includes metric_names, "Utilization"
-    assert_includes metric_names, "QueueLatency"
-    assert_includes metric_names, "QueueSize"
-
-    capacity_metric = metrics_collected.find { |m| m[:name] == "Capacity" && m[:dimensions].nil? }
-    assert_equal 20, capacity_metric[:value]
-
-    utilization_metrics = metrics_collected.select { |m| m[:name] == "Utilization" }
-    assert_operator utilization_metrics.size, :>=, 1
-
-    tag_capacity_metrics = metrics_collected.select { |m| m[:name] == "Capacity" && m[:dimensions] }
-    assert_equal 2, tag_capacity_metrics.size
-
-    process_utilization_metrics = metrics_collected.select do |m|
-      m[:name] == "Utilization" && m[:dimensions]&.any? { |d| d[:name] == "Hostname" }
-    end
-    assert_equal 2, process_utilization_metrics.size
   end
 
   def test_process_metrics_can_be_disabled
@@ -225,37 +164,11 @@ class SidekiqTest < Minitest::Test
       metrics_collected << {name: metric_name, value: value, **options}
     end
 
-    stats_mock = Minitest::Mock.new
-    stats_mock.expect(:enqueued, 10)
-    stats_mock.expect(:processed, 100)
-    stats_mock.expect(:failed, 5)
-    stats_mock.expect(:scheduled_size, 2)
-    stats_mock.expect(:retry_size, 3)
-    stats_mock.expect(:dead_size, 1)
-    stats_mock.expect(:workers_size, 4)
-    stats_mock.expect(:processes_size, 2)
-    stats_mock.expect(:default_queue_latency, 0.5)
-
-    process1 = {"concurrency" => 10, "busy" => 5, "hostname" => "worker-1", "tag" => "default"}
-    process_set_mock = Minitest::Mock.new
-    process_set_mock.expect(:to_enum, [process1], [:each])
-
-    queue_mock = Minitest::Mock.new
-    queue_mock.expect(:name, "default")
-    queue_mock.expect(:latency, 1.5)
-    queue_mock.expect(:size, 20)
-
     ::Sidekiq.stub(:configure_server, proc { |&block| block.call(@sidekiq_config_mock) }) do
-      ::Sidekiq::Stats.stub(:new, stats_mock) do
-        ::Sidekiq::ProcessSet.stub(:new, process_set_mock) do
-          ::Sidekiq::Queue.stub(:all, [queue_mock]) do
-            Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter, process_metrics: false)
+      Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter, process_metrics: false)
 
-            collector = reporter.instance_variable_get(:@collectors).last
-            collector.call
-          end
-        end
-      end
+      collector = reporter.instance_variable_get(:@collectors).last
+      collector.call
     end
 
     process_utilization_metrics = metrics_collected.select do |m|

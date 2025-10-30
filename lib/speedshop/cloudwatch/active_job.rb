@@ -7,8 +7,6 @@ module Speedshop
         base.around_perform :report_job_metrics
       end
 
-      private
-
       def report_job_metrics
         enqueued_at = self.enqueued_at
         start_time = Time.now
@@ -20,6 +18,8 @@ module Speedshop
           report("job_queue_time", queue_time, namespace: "ActiveJob", unit: "Seconds", dimensions: job_dimensions)
         end
       end
+
+      private
 
       def report(*args, **kwargs)
         Cloudwatch.reporter.report(*args, **kwargs)

@@ -3,8 +3,6 @@
 module Speedshop
   module Cloudwatch
     class MetricReporter
-      attr_reader :interval, :client
-
       def initialize(config:)
         raise ArgumentError, "CloudWatch client must be provided" unless config.client
         @interval = config.interval
@@ -74,12 +72,7 @@ module Speedshop
       end
 
       def collect_metrics
-        collectors = nil
-        @mutex.synchronize do
-          collectors = @collectors.dup
-        end
-
-        collectors.each do |collector|
+        @collectors.each do |collector|
           collector.call
         rescue => e
           warn "Collector error: #{e.message}"
