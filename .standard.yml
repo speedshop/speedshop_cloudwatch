@@ -1,13 +1,6 @@
 # For available configuration options, see:
 #   https://github.com/standardrb/standard
-ruby_version: 3.0
-format: progress
-ignore:
-  - '!**/.*'
-fix: false
-parallel: true
-plugins: []
+ruby_version: 2.7
 
-# RuboCop configuration overrides
 Layout/LineLength:
   Max: 120
