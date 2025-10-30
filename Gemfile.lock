@@ -116,10 +116,10 @@ PLATFORMS
 DEPENDENCIES
   irb
   minitest
-  puma
+  puma (>= 5.0)
   rack
   rake (~> 13.0)
-  sidekiq
+  sidekiq (>= 6.0)
   speedshop-cloudwatch!
   standard (>= 1.35.1)
 
