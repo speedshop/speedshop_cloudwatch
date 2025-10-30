@@ -29,15 +29,12 @@ gem `speedshop_cloudwatch`
 
 ## Version Support
 
-This gem supports:
+This gem is tested against the following combinations:
 
-- **Ruby**: 2.7, 3.0, 3.1, 3.2, 3.3, 3.4
-- **Puma**: 6.x, 7.x
-- **Sidekiq**: 7.x, 8.x
+- **Ruby 2.7, 3.0, 3.1**: Puma 6.x + Sidekiq 7.x
+- **Ruby 3.2, 3.3, 3.4**: Puma 7.x + Sidekiq 8.x
 
-Note: Some combinations have minimum Ruby requirements:
-- Puma 7.x requires Ruby 3.0+
-- Sidekiq 8.x requires Ruby 3.2+
+Newer gem versions are tested on newer Ruby versions, older gem versions on older Ruby versions. This ensures compatibility while focusing testing resources on realistic production scenarios.
 
 ## Configuration
 
