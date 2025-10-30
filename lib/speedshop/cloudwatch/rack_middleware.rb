@@ -8,18 +8,19 @@ module Speedshop
       end
 
       def call(env)
-        queue_start = extract_queue_start(env)
+        begin
+          queue_start = extract_queue_start(env)
 
-        status, headers, body = @app.call(env)
-
-        if queue_start
-          queue_time = (Time.now.to_f * 1000) - queue_start
-          reporter = Speedshop::Cloudwatch.reporter
-          namespace = "Rack"
-          reporter.report("request_queue_time", queue_time, namespace: namespace, unit: "Milliseconds")
+          if queue_start
+            queue_time = (Time.now.to_f * 1000) - queue_start
+            reporter = Speedshop::Cloudwatch.reporter
+            namespace = Speedshop::Cloudwatch.config.namespaces[:rack]
+            reporter.report("request_queue_time", queue_time, namespace: namespace, unit: "Milliseconds")
+          end
+        rescue
         end
 
-        [status, headers, body]
+        @app.call(env)
       end
 
       private

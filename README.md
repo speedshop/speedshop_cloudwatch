@@ -27,6 +27,60 @@ This gem tracks queue depths, latencies, and resource utilization - metrics that
 gem `speedshop_cloudwatch`
 ```
 
+## Configuration
+
+You can configure which integrations are enabled, which metrics are reported, and the CloudWatch namespace for each integration:
+
+```ruby
+Speedshop::Cloudwatch.configure do |config|
+  config.client = Aws::CloudWatch::Client.new
+  config.interval = 60
+
+  # Optional: Custom logger (defaults to Rails.logger if available, otherwise STDOUT)
+  config.logger = Logger.new(Rails.root.join("log", "cloudwatch.log"))
+
+  # Disable an entire integration
+  config.enabled[:rack] = false
+
+  # Customize which metrics to report (whitelist)
+  config.metrics[:puma] = [:workers, :booted_workers, :running, :backlog]
+  config.metrics[:sidekiq] = [:EnqueuedJobs, :QueueLatency, :QueueSize]
+
+  # Customize which Sidekiq queues to monitor (all queues by default)
+  config.sidekiq_queues = ["critical", "default", "low_priority"]
+
+  # Customize CloudWatch namespaces
+  config.namespaces[:puma] = "MyApp/Puma"
+  config.namespaces[:sidekiq] = "MyApp/Sidekiq"
+  config.namespaces[:rack] = "MyApp/Rack"
+  config.namespaces[:active_job] = "MyApp/ActiveJob"
+end
+```
+
+### Default Metrics
+
+If not configured, all metrics are enabled by default. Here are the default metric lists you can copy and customize:
+
+**Puma:**
+```ruby
+config.metrics[:puma] = [:workers, :booted_workers, :old_workers, :running, :backlog, :pool_capacity, :max_threads]
+```
+
+**Sidekiq:**
+```ruby
+config.metrics[:sidekiq] = [:EnqueuedJobs, :ProcessedJobs, :FailedJobs, :ScheduledJobs, :RetryJobs, :DeadJobs, :Workers, :Processes, :DefaultQueueLatency, :Capacity, :Utilization, :QueueLatency, :QueueSize]
+```
+
+**Rack:**
+```ruby
+config.metrics[:rack] = [:request_queue_time]
+```
+
+**ActiveJob:**
+```ruby
+config.metrics[:active_job] = [:job_queue_time]
+```
+
 ### Puma Integration
 
 Add to your `config/puma.rb`:
@@ -78,20 +132,27 @@ If you're using Speedshop with ActiveJob, you should use this integration rather
 We report the following metrics:
 
 ```
-enqueued - Number of jobs currently enqueued (Count)
-processed - Total number of jobs processed (Count)
-failed - Total number of failed jobs (Count)
-scheduled_size - Number of scheduled jobs (Count)
-retry_size - Number of jobs in retry queue (Count)
-dead_size - Number of dead jobs (Count)
-workers_size - Number of Sidekiq workers (Count)
-queue_latency - Latency for each queue (Seconds) [per queue]
-queue_size - Size of each queue (Count) [per queue]
+EnqueuedJobs - Number of jobs currently enqueued (Count)
+ProcessedJobs - Total number of jobs processed (Count)
+FailedJobs - Total number of failed jobs (Count)
+ScheduledJobs - Number of scheduled jobs (Count)
+RetryJobs - Number of jobs in retry queue (Count)
+DeadJobs - Number of dead jobs (Count)
+Workers - Number of Sidekiq workers (Count)
+Processes - Number of Sidekiq processes (Count)
+DefaultQueueLatency - Latency for the default queue (Seconds)
+Capacity - Total concurrency across all processes (Count)
+Utilization - Average utilization across all processes (Percent)
+QueueLatency - Latency for each queue (Seconds) [per queue]
+QueueSize - Size of each queue (Count) [per queue]
 ```
 
 Metrics marked [per queue] include a QueueName dimension.
+Capacity and Utilization metrics may include Tag and/or Hostname dimensions.
 
 ### ActiveJob integration
+
+**Note: if you're using Sidekiq, just use that integration, and don't do the following!**
 
 In your ApplicationJob:
 

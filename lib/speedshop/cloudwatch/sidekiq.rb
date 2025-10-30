@@ -4,8 +4,8 @@ module Speedshop
   module Cloudwatch
     module Sidekiq
       class << self
-        def register(namespace: "Sidekiq", reporter: Speedshop::Cloudwatch.reporter, process_metrics: true)
-          @namespace = namespace
+        def register(namespace: nil, reporter: Speedshop::Cloudwatch.reporter, process_metrics: true)
+          @namespace = namespace || Speedshop::Cloudwatch.config.namespaces[:sidekiq]
           @reporter = reporter
           @process_metrics = process_metrics
 
@@ -89,10 +89,22 @@ module Speedshop
             end
           end
 
-          ::Sidekiq::Queue.all.each do |queue|
+          queues = queues_to_monitor
+          queues.each do |queue|
             dimensions = [{name: "QueueName", value: queue.name}]
             @reporter.report("QueueLatency", queue.latency, namespace: @namespace, unit: "Seconds", dimensions: dimensions)
             @reporter.report("QueueSize", queue.size, namespace: @namespace, unit: "Count", dimensions: dimensions)
+          end
+        end
+
+        def queues_to_monitor
+          configured_queues = Speedshop::Cloudwatch.config.sidekiq_queues
+          all_queues = ::Sidekiq::Queue.all
+
+          if configured_queues.nil? || configured_queues.empty?
+            all_queues
+          else
+            all_queues.select { |queue| configured_queues.include?(queue.name) }
           end
         end
 

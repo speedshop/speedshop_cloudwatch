@@ -4,8 +4,8 @@ module Speedshop
   module Cloudwatch
     module Puma
       class << self
-        def register(namespace: "Puma", reporter: Speedshop::Cloudwatch.reporter)
-          @namespace = namespace
+        def register(namespace: nil, reporter: Speedshop::Cloudwatch.reporter)
+          @namespace = namespace || Speedshop::Cloudwatch.config.namespaces[:puma]
           @reporter = reporter
 
           @reporter.register_collector do

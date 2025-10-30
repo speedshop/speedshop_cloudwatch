@@ -9,14 +9,14 @@ module Speedshop
 
       def report_job_metrics
         enqueued_at = self.enqueued_at
-        start_time = Time.now
-
-        yield
 
         if enqueued_at
-          queue_time = start_time.to_f - enqueued_at
-          report("job_queue_time", queue_time, namespace: "ActiveJob", unit: "Seconds", dimensions: job_dimensions)
+          queue_time = Time.now.to_f - enqueued_at
+          namespace = Speedshop::Cloudwatch.config.namespaces[:active_job]
+          report("job_queue_time", queue_time, namespace: namespace, unit: "Seconds", dimensions: job_dimensions)
         end
+
+        yield
       end
 
       private

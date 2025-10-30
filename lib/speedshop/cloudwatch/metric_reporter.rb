@@ -7,6 +7,8 @@ module Speedshop
         raise ArgumentError, "CloudWatch client must be provided" unless config.client
         @interval = config.interval
         @client = config.client
+        @config = config
+        @logger = config.logger
         @thread = nil
         @pid = nil
         @running = false
@@ -18,6 +20,11 @@ module Speedshop
       def start!
         @mutex.synchronize do
           return if running_in_current_process?
+          unless any_integration_enabled?
+            @logger.info "Speedshop::Cloudwatch: No integrations enabled, not starting reporter"
+            return
+          end
+          @logger.info "Speedshop::Cloudwatch: Starting metric reporter (interval: #{@interval}s)"
           @pid = Process.pid
           @running = true
           @thread = Thread.new do
@@ -29,6 +36,7 @@ module Speedshop
 
       def stop!
         @mutex.synchronize do
+          @logger.info "Speedshop::Cloudwatch: Stopping metric reporter"
           @running = false
           @thread&.join
           @thread = nil
@@ -37,6 +45,8 @@ module Speedshop
       end
 
       def report(metric_name, value, namespace:, unit: "None", dimensions: [])
+        return unless metric_enabled?(metric_name, namespace)
+
         @mutex.synchronize do
           @queue << {
             metric_name: metric_name,
@@ -57,6 +67,24 @@ module Speedshop
 
       private
 
+      def any_integration_enabled?
+        @config.enabled.values.any?
+      end
+
+      def metric_enabled?(metric_name, namespace)
+        integration = namespace_to_integration(namespace)
+        return true unless integration
+
+        @config.enabled_integration?(integration) && @config.metrics[integration].include?(metric_name.to_sym)
+      end
+
+      def namespace_to_integration(namespace)
+        @config.namespaces.each do |integration, ns|
+          return integration if ns == namespace
+        end
+        nil
+      end
+
       def running_in_current_process?
         @running && @pid == Process.pid
       end
@@ -68,14 +96,16 @@ module Speedshop
           flush_metrics
         end
       rescue => e
-        warn "MetricReporter error: #{e.message}"
+        @logger.error "Speedshop::Cloudwatch: MetricReporter error: #{e.message}"
+        @logger.debug e.backtrace.join("\n")
       end
 
       def collect_metrics
         @collectors.each do |collector|
           collector.call
         rescue => e
-          warn "Collector error: #{e.message}"
+          @logger.error "Speedshop::Cloudwatch: Collector error: #{e.message}"
+          @logger.debug e.backtrace.join("\n")
         end
       end
 
@@ -98,13 +128,15 @@ module Speedshop
             }
           end
 
+          @logger.debug "Speedshop::Cloudwatch: Sending #{metric_data.size} metrics to namespace #{namespace}"
           @client.put_metric_data(
             namespace: namespace,
             metric_data: metric_data
           )
         end
       rescue => e
-        warn "Failed to send metrics: #{e.message}"
+        @logger.error "Speedshop::Cloudwatch: Failed to send metrics: #{e.message}"
+        @logger.debug e.backtrace.join("\n")
       end
     end
   end

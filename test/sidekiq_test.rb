@@ -37,6 +37,7 @@ class SidekiqTest < Minitest::Test
       config: Speedshop::Cloudwatch::Configuration.new.tap do |c|
         c.client = client
         c.interval = 60
+        c.logger = Logger.new(nil)
       end
     )
 
@@ -53,6 +54,7 @@ class SidekiqTest < Minitest::Test
       config: Speedshop::Cloudwatch::Configuration.new.tap do |c|
         c.client = client
         c.interval = 60
+        c.logger = Logger.new(nil)
       end
     )
 
@@ -66,12 +68,93 @@ class SidekiqTest < Minitest::Test
     refute @lifecycle_callbacks.key?(:leader), "Expected :leader hook NOT to be registered for OSS"
   end
 
+  def test_filters_queues_when_configured
+    queues = [
+      double_queue("critical", 1, 1.5),
+      double_queue("default", 2, 0.5),
+      double_queue("low_priority", 3, 2.0)
+    ]
+
+    Speedshop::Cloudwatch.configure do |config|
+      config.client = Minitest::Mock.new
+      config.interval = 60
+      config.logger = Logger.new(nil)
+      config.sidekiq_queues = ["critical", "default"]
+    end
+
+    metrics_collected = []
+    reporter = Speedshop::Cloudwatch.reporter
+    reporter.define_singleton_method(:report) do |metric_name, value, **options|
+      metrics_collected << {name: metric_name, value: value, **options}
+    end
+
+    ::Sidekiq::Queue.stub(:all, queues) do
+      ::Sidekiq.stub(:configure_server, proc { |&block| block.call(@sidekiq_config_mock) }) do
+        Speedshop::Cloudwatch::Sidekiq.register(reporter: reporter)
+        collector = reporter.instance_variable_get(:@collectors).last
+        collector.call
+      end
+    end
+
+    queue_metrics = metrics_collected.select { |m| m[:dimensions]&.any? { |d| d[:name] == "QueueName" } }
+    queue_names = queue_metrics.map { |m| m[:dimensions].find { |d| d[:name] == "QueueName" }[:value] }.uniq
+
+    assert_includes queue_names, "critical"
+    assert_includes queue_names, "default"
+    refute_includes queue_names, "low_priority"
+  end
+
+  def double_queue(name, size, latency)
+    queue = Object.new
+    queue.define_singleton_method(:name) { name }
+    queue.define_singleton_method(:size) { size }
+    queue.define_singleton_method(:latency) { latency }
+    queue
+  end
+
+  def test_monitors_all_queues_by_default
+    queues = [
+      double_queue("critical", 1, 1.5),
+      double_queue("default", 2, 0.5),
+      double_queue("low_priority", 3, 2.0)
+    ]
+
+    Speedshop::Cloudwatch.configure do |config|
+      config.client = Minitest::Mock.new
+      config.interval = 60
+      config.logger = Logger.new(nil)
+      config.sidekiq_queues = nil
+    end
+
+    metrics_collected = []
+    reporter = Speedshop::Cloudwatch.reporter
+    reporter.define_singleton_method(:report) do |metric_name, value, **options|
+      metrics_collected << {name: metric_name, value: value, **options}
+    end
+
+    ::Sidekiq::Queue.stub(:all, queues) do
+      ::Sidekiq.stub(:configure_server, proc { |&block| block.call(@sidekiq_config_mock) }) do
+        Speedshop::Cloudwatch::Sidekiq.register(reporter: reporter)
+        collector = reporter.instance_variable_get(:@collectors).last
+        collector.call
+      end
+    end
+
+    queue_metrics = metrics_collected.select { |m| m[:dimensions]&.any? { |d| d[:name] == "QueueName" } }
+    queue_names = queue_metrics.map { |m| m[:dimensions].find { |d| d[:name] == "QueueName" }[:value] }.uniq
+
+    assert_includes queue_names, "critical"
+    assert_includes queue_names, "default"
+    assert_includes queue_names, "low_priority"
+  end
+
   def test_lifecycle_hooks_registered_for_enterprise
     client = Minitest::Mock.new
     reporter = Speedshop::Cloudwatch::MetricReporter.new(
       config: Speedshop::Cloudwatch::Configuration.new.tap do |c|
         c.client = client
         c.interval = 60
+        c.logger = Logger.new(nil)
       end
     )
 
@@ -100,6 +183,7 @@ class SidekiqTest < Minitest::Test
       config: Speedshop::Cloudwatch::Configuration.new.tap do |c|
         c.client = client
         c.interval = 60
+        c.logger = Logger.new(nil)
       end
     )
 
@@ -122,6 +206,7 @@ class SidekiqTest < Minitest::Test
       config: Speedshop::Cloudwatch::Configuration.new.tap do |c|
         c.client = client
         c.interval = 60
+        c.logger = Logger.new(nil)
       end
     )
 
@@ -157,6 +242,7 @@ class SidekiqTest < Minitest::Test
       config: Speedshop::Cloudwatch::Configuration.new.tap do |c|
         c.client = client
         c.interval = 60
+        c.logger = Logger.new(nil)
       end
     )
 

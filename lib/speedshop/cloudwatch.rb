@@ -29,8 +29,10 @@ module Speedshop
       end
 
       def reporter
+        return @reporter if defined?(@reporter) && @reporter
+
         @reporter_mutex.synchronize do
-          @reporter ||= MetricReporter.new(config: config)
+          @reporter = MetricReporter.new(config: config)
         end
       end
     end
