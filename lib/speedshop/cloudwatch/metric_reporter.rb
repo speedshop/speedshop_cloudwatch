@@ -75,7 +75,7 @@ module Speedshop
         integration = namespace_to_integration(namespace)
         return true unless integration
 
-        @config.enabled_integration?(integration) && @config.metrics[integration].include?(metric_name.to_sym)
+        @config.enabled[integration] && @config.metrics[integration].include?(metric_name.to_sym)
       end
 
       def namespace_to_integration(namespace)

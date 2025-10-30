@@ -32,10 +32,6 @@ module Speedshop
         @logger = default_logger
       end
 
-      def enabled_integration?(integration)
-        @enabled[integration]
-      end
-
       private
 
       def default_logger

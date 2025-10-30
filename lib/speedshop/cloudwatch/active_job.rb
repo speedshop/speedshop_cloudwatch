@@ -8,12 +8,16 @@ module Speedshop
       end
 
       def report_job_metrics
-        enqueued_at = self.enqueued_at
+        begin
+          enqueued_at = self.enqueued_at
 
-        if enqueued_at
-          queue_time = Time.now.to_f - enqueued_at
-          namespace = Speedshop::Cloudwatch.config.namespaces[:active_job]
-          report("job_queue_time", queue_time, namespace: namespace, unit: "Seconds", dimensions: job_dimensions)
+          if enqueued_at
+            queue_time = Time.now.to_f - enqueued_at
+            namespace = Speedshop::Cloudwatch.config.namespaces[:active_job]
+            report("job_queue_time", queue_time, namespace: namespace, unit: "Seconds", dimensions: job_dimensions)
+          end
+        rescue => e
+          Speedshop.logger.error("Failed to report ActiveJob queue time: #{e.message}")
         end
 
         yield
