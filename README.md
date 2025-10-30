@@ -9,7 +9,17 @@ This gem helps integrate your Ruby application with AWS Cloudwatch.
 
 Cloudwatch is unusually difficult to integrate with properly in Ruby, because the AWS library simply makes a straight-up synchronous HTTP request to AWS every time you record a metric. This is unlike the statsd or UDP-based models used by Datadog or other providers, which return more-or-less-instantaneously and are a lot less dangerous to use. Naively implementing this stuff yourself, you could end up adding 20-50ms of delay to your jobs or responses.
 
-This library helps you avoid that latency by reporting to Cloudwatch in a  background thread.
+This library helps you avoid that latency by reporting to Cloudwatch in a background thread.
+
+## What This Gem Does NOT Track
+
+This gem focuses on **infrastructure and queue metrics**, not application performance metrics. Specifically:
+
+- **No request/response times** - Use your APM tool (New Relic, Scout, Datadog APM, etc.) for this
+- **No job execution times** - Use your APM tool for detailed job performance tracking
+- **No error rates** - Use your APM or error tracking tool (Sentry, Rollbar, etc.)
+
+This gem tracks queue depths, latencies, and resource utilization - metrics that help you understand if you need to scale your infrastructure. For detailed application performance and error tracking, use dedicated APM tools.
 
 ## Installation
 
@@ -93,7 +103,6 @@ We report the following metrics:
 
 ```
 job_queue_time - Time job spent waiting in queue before execution (Seconds)
-job_execution_time - Time spent executing the job (Seconds)
 ```
 
-Both metrics include JobClass and QueueName dimensions.
+This metric includes JobClass and QueueName dimensions.

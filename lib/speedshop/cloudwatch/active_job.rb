@@ -19,9 +19,6 @@ module Speedshop
           queue_time = start_time.to_f - enqueued_at
           report("job_queue_time", queue_time, namespace: "ActiveJob", unit: "Seconds", dimensions: job_dimensions)
         end
-
-        execution_time = Time.now - start_time
-        report("job_execution_time", execution_time, namespace: "ActiveJob", unit: "Seconds", dimensions: job_dimensions)
       end
 
       def report(*args, **kwargs)
