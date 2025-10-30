@@ -5,10 +5,7 @@ module Speedshop
     class MetricReporter
       def initialize(config:)
         raise ArgumentError, "CloudWatch client must be provided" unless config.client
-        @interval = config.interval
-        @client = config.client
         @config = config
-        @logger = config.logger
         @thread = nil
         @pid = nil
         @running = false
@@ -21,10 +18,10 @@ module Speedshop
         @mutex.synchronize do
           return if running_in_current_process?
           unless any_integration_enabled?
-            @logger.info "Speedshop::Cloudwatch: No integrations enabled, not starting reporter"
+            @config.logger.info "Speedshop::Cloudwatch: No integrations enabled, not starting reporter"
             return
           end
-          @logger.info "Speedshop::Cloudwatch: Starting metric reporter (interval: #{@interval}s)"
+          @config.logger.info "Speedshop::Cloudwatch: Starting metric reporter (interval: #{@config.interval}s)"
           @pid = Process.pid
           @running = true
           @thread = Thread.new do
@@ -36,7 +33,7 @@ module Speedshop
 
       def stop!
         @mutex.synchronize do
-          @logger.info "Speedshop::Cloudwatch: Stopping metric reporter"
+          @config.logger.info "Speedshop::Cloudwatch: Stopping metric reporter"
           @running = false
           @thread&.join
           @thread = nil
@@ -91,21 +88,21 @@ module Speedshop
 
       def run_loop
         while @running
-          sleep @interval
+          sleep @config.interval
           collect_metrics
           flush_metrics
         end
       rescue => e
-        @logger.error "Speedshop::Cloudwatch: MetricReporter error: #{e.message}"
-        @logger.debug e.backtrace.join("\n")
+        @config.logger.error "Speedshop::Cloudwatch: MetricReporter error: #{e.message}"
+        @config.logger.debug e.backtrace.join("\n")
       end
 
       def collect_metrics
         @collectors.each do |collector|
           collector.call
         rescue => e
-          @logger.error "Speedshop::Cloudwatch: Collector error: #{e.message}"
-          @logger.debug e.backtrace.join("\n")
+          @config.logger.error "Speedshop::Cloudwatch: Collector error: #{e.message}"
+          @config.logger.debug e.backtrace.join("\n")
         end
       end
 
@@ -128,15 +125,15 @@ module Speedshop
             }
           end
 
-          @logger.debug "Speedshop::Cloudwatch: Sending #{metric_data.size} metrics to namespace #{namespace}"
-          @client.put_metric_data(
+          @config.logger.debug "Speedshop::Cloudwatch: Sending #{metric_data.size} metrics to namespace #{namespace}"
+          @config.client.put_metric_data(
             namespace: namespace,
             metric_data: metric_data
           )
         end
       rescue => e
-        @logger.error "Speedshop::Cloudwatch: Failed to send metrics: #{e.message}"
-        @logger.debug e.backtrace.join("\n")
+        @config.logger.error "Speedshop::Cloudwatch: Failed to send metrics: #{e.message}"
+        @config.logger.debug e.backtrace.join("\n")
       end
     end
   end
