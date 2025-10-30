@@ -38,10 +38,11 @@ module Speedshop
 
       def report(metric_name, value, namespace:, unit: "None", dimensions: [])
         integration = @config.namespaces.key(namespace)
-        return if integration && (!@config.enabled[integration] || !@config.metrics[integration].include?(metric_name.to_sym))
+        return if integration && !metric_allowed?(integration, metric_name)
 
         @mutex.synchronize do
-          @queue << {metric_name: metric_name, value: value, namespace: namespace, unit: unit, dimensions: dimensions, timestamp: Time.now}
+          @queue << {metric_name: metric_name, value: value, namespace: namespace, unit: unit,
+                     dimensions: dimensions, timestamp: Time.now}
         end
       end
 
@@ -54,7 +55,13 @@ module Speedshop
       def run_loop
         while @running
           sleep @config.interval
-          @collectors.each { |c| c.call rescue log_error("Collector error: #{$!.message}") }
+          @collectors.each { |c|
+            begin
+              c.call
+            rescue
+              log_error("Collector error: #{$!.message}")
+            end
+          }
           flush_metrics
         end
       rescue => e
@@ -67,10 +74,15 @@ module Speedshop
 
         metrics.group_by { |m| m[:namespace] }.each do |namespace, ns_metrics|
           @config.logger.debug "Speedshop::Cloudwatch: Sending #{ns_metrics.size} metrics to namespace #{namespace}"
-          @config.client.put_metric_data(namespace: namespace, metric_data: ns_metrics.map { |m| m.slice(:metric_name, :value, :unit, :timestamp, :dimensions) })
+          metric_data = ns_metrics.map { |m| m.slice(:metric_name, :value, :unit, :timestamp, :dimensions) }
+          @config.client.put_metric_data(namespace: namespace, metric_data: metric_data)
         end
       rescue => e
         log_error("Failed to send metrics: #{e.message}")
+      end
+
+      def metric_allowed?(integration, metric_name)
+        @config.enabled[integration] && @config.metrics[integration].include?(metric_name.to_sym)
       end
 
       def log_info(msg)

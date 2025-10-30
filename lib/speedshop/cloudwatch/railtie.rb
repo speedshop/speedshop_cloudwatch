@@ -6,9 +6,15 @@ module Speedshop
       initializer "speedshop.cloudwatch.start_reporter" do
         config.after_initialize do
           next if caller.any? { |c| c.include?("console_command.rb") || c.include?("runner_command.rb") }
-          next if defined?(::Rake) && ::Rake.respond_to?(:application) && (::Rake.application.top_level_tasks || []).any? { |t| t.match?(/^(assets:|db:|webpacker:)/) }
+          next if in_rake_task?
           Speedshop::Cloudwatch.reporter.start!
         end
+      end
+
+      def self.in_rake_task?
+        return false unless defined?(::Rake) && ::Rake.respond_to?(:application)
+        tasks = ::Rake.application.top_level_tasks || []
+        tasks.any? { |t| t.match?(/^(assets:|db:|webpacker:)/) }
       end
     end
   end

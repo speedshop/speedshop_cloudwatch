@@ -15,16 +15,24 @@ module Speedshop
         def collect_metrics
           return unless defined?(::Puma)
           stats = ::Puma.stats_hash
-          %i[workers booted_workers old_workers].each { |m| @reporter.report(m.to_s.split("_").map(&:capitalize).join, stats[m] || 0, namespace: @namespace, unit: "Count") }
+          %i[workers booted_workers old_workers].each do |m|
+            metric_name = m.to_s.split("_").map(&:capitalize).join
+            @reporter.report(metric_name, stats[m] || 0, namespace: @namespace, unit: "Count")
+          end
 
-          workers = stats[:worker_status] ? stats[:worker_status].map { |w| [w[:last_status], stats[:worker_status].index(w)] if w[:last_status] }.compact : [[stats, 0]]
+          workers = stats[:worker_status] ? worker_statuses(stats) : [[stats, 0]]
           workers.each { |worker_stats, idx| report_worker(worker_stats, idx) }
+        end
+
+        def worker_statuses(stats)
+          stats[:worker_status].map { |w| [w[:last_status], stats[:worker_status].index(w)] if w[:last_status] }.compact
         end
 
         def report_worker(stats, idx)
           dims = [{name: "WorkerIndex", value: idx.to_s}]
           %i[running backlog pool_capacity max_threads].each do |m|
-            @reporter.report(m.to_s.split("_").map(&:capitalize).join, stats[m] || 0, namespace: @namespace, unit: "Count", dimensions: dims)
+            metric_name = m.to_s.split("_").map(&:capitalize).join
+            @reporter.report(metric_name, stats[m] || 0, namespace: @namespace, unit: "Count", dimensions: dims)
           end
         end
       end

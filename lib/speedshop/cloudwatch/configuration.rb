@@ -13,7 +13,10 @@ module Speedshop
         @enabled = {puma: true, sidekiq: true, rack: true, active_job: true}
         @metrics = {
           puma: [:Workers, :BootedWorkers, :OldWorkers, :Running, :Backlog, :PoolCapacity, :MaxThreads],
-          sidekiq: [:EnqueuedJobs, :ProcessedJobs, :FailedJobs, :ScheduledJobs, :RetryJobs, :DeadJobs, :Workers, :Processes, :DefaultQueueLatency, :Capacity, :Utilization, :QueueLatency, :QueueSize],
+          sidekiq: [
+            :EnqueuedJobs, :ProcessedJobs, :FailedJobs, :ScheduledJobs, :RetryJobs, :DeadJobs,
+            :Workers, :Processes, :DefaultQueueLatency, :Capacity, :Utilization, :QueueLatency, :QueueSize
+          ],
           rack: [:RequestQueueTime],
           active_job: [:JobQueueTime]
         }
