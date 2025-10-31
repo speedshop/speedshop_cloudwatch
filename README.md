@@ -1,15 +1,40 @@
 # Speedshop::Cloudwatch
 
-This gem helps integrate your Ruby application with AWS Cloudwatch.
+This gem helps integrate your Ruby application with AWS Cloudwatch. There are integrations for **Puma**, **Rack**, **Sidekiq** and **ActiveJob**.
 
-* **Puma** will report statistics (like busy_threads) as metrics.
-* **Rack** applications will report request queue time as metrics, via a Rack middleware.
-* **Sidekiq** applications report queue latencies as metrics, using a background reporting thread.
-* Rails apps using **ActiveJob** report queue latencies with the `around_perform` callback.
+Cloudwatch is unusually difficult to integrate with properly in Ruby, because the AWS library simply makes a straight-up synchronous HTTP request to AWS every time you record a metric. This is unlike the statsd or UDP-based models used by Datadog or other providers, which return more-or-less-instantaneously and are a lot less dangerous to use. Naively implementing this stuff yourself, you could end up adding 20-50ms of delay to your jobs or responses!
 
-Cloudwatch is unusually difficult to integrate with properly in Ruby, because the AWS library simply makes a straight-up synchronous HTTP request to AWS every time you record a metric. This is unlike the statsd or UDP-based models used by Datadog or other providers, which return more-or-less-instantaneously and are a lot less dangerous to use. Naively implementing this stuff yourself, you could end up adding 20-50ms of delay to your jobs or responses.
+This library helps you avoid that latency by reporting to Cloudwatch in a background thread.
 
-This library helps you avoid that latency by reporting to Cloudwatch in a  background thread.
+This library supports **Ruby 2.7+, Sidekiq 7+, and Puma 6+**.
+
+## Metrics
+
+If not configured, all metrics are enabled by default. Here are the default metric lists you can copy and customize:
+
+**Puma:**
+```ruby
+config.metrics[:puma] = [:Workers, :BootedWorkers, :OldWorkers, :Running, :Backlog, :PoolCapacity, :MaxThreads]
+```
+
+**Sidekiq:**
+```ruby
+config.metrics[:sidekiq] = [:EnqueuedJobs, :ProcessedJobs, :FailedJobs, :ScheduledJobs, :RetryJobs, :DeadJobs, :Workers, :Processes, :DefaultQueueLatency, :Capacity, :Utilization, :QueueLatency, :QueueSize]
+```
+
+**Rack:**
+```ruby
+config.metrics[:rack] = [:RequestQueueTime]
+```
+
+**ActiveJob:**
+```ruby
+config.metrics[:active_job] = [:QueueLatency]
+```
+
+For a full explanation of every metric, [read our docs.](./docs/metrics.md)
+
+This gem is for **infrastructure and queue metrics**, not application performance metrics, like response times, job execution times, or error rates. Use your APM for that stuff.
 
 ## Installation
 
@@ -17,21 +42,86 @@ This library helps you avoid that latency by reporting to Cloudwatch in a  backg
 gem `speedshop_cloudwatch`
 ```
 
+## Configuration
+
+You can configure which integrations are enabled, which metrics are reported, and the CloudWatch namespace for each integration:
+
+```ruby
+Speedshop::Cloudwatch.configure do |config|
+  config.client = Aws::CloudWatch::Client.new
+  config.interval = 60
+
+  # Optional: Custom logger (defaults to Rails.logger if available, otherwise STDOUT)
+  config.logger = Logger.new(Rails.root.join("log", "cloudwatch.log"))
+
+  # Disable an entire integration
+  config.enabled[:rack] = false
+
+  # Customize which metrics to report (whitelist)
+  config.metrics[:puma] = [:Workers, :BootedWorkers, :Running, :Backlog]
+  config.metrics[:sidekiq] = [:EnqueuedJobs, :QueueLatency, :QueueSize]
+
+  # Customize which Sidekiq queues to monitor (all queues by default)
+  config.sidekiq_queues = ["critical", "default", "low_priority"]
+
+  # Customize CloudWatch namespaces
+  config.namespaces[:puma] = "MyApp/Puma"
+  config.namespaces[:sidekiq] = "MyApp/Sidekiq"
+  config.namespaces[:rack] = "MyApp/Rack"
+  config.namespaces[:active_job] = "MyApp/ActiveJob"
+end
+```
+
+### Rails
+
+By default, if you're using Rails, the gem automatically inserts the Rack middleware at the top of the middleware stack.
+
+The reporter starts automatically when the first metric is reported - no manual setup required.
+
+If you want full control over initialization, add `require: false` to your Gemfile:
+
+```ruby
+gem 'speedshop_cloudwatch', require: false
+```
+
+Then manually require the core module without the railtie:
+
+```ruby
+require 'speedshop/cloudwatch'
+
+# Insert middleware manually (if using Rack integration)
+Rails.application.config.middleware.insert_before 0, Speedshop::Cloudwatch::RackMiddleware
+
+# Register integrations
+Speedshop::Cloudwatch::Puma.register  # if using Puma
+Speedshop::Cloudwatch::Sidekiq.register  # if using Sidekiq
+
+# Reporter starts automatically when first metric is reported
+```
+
 ### Puma Integration
 
 Add to your `config/puma.rb`:
 
 ```ruby
-before_fork do
-  Speedshop::Cloudwatch::Puma.start!
-end
+Speedshop::Cloudwatch::Puma.register
 ```
 
-This then reports the following metrics:
+The reporter automatically starts in each worker process on the first request. This works correctly with both `preload_app true` and `false`, as well as single and cluster modes.
+
+This reports the following metrics:
 
 ```
-TODO: Fill this in based on Puma.stats output
+Workers - Number of workers configured (Count)
+BootedWorkers - Number of workers currently booted (Count)
+OldWorkers - Number of workers that are old/being phased out (Count)
+Running - Number of threads currently running (Count) [per worker]
+Backlog - Number of requests in the backlog (Count) [per worker]
+PoolCapacity - Current thread pool capacity (Count) [per worker]
+MaxThreads - Maximum number of threads configured (Count) [per worker]
 ```
+
+Metrics marked [per worker] include a WorkerIndex dimension.
 
 ### Rack Integration
 
@@ -44,7 +134,7 @@ You will need to have a reverse proxy, such as nginx, adding `X-Request-Queue-St
 We report the following metrics:
 
 ```
-TODO: fill in
+RequestQueueTime - Time spent waiting in the request queue (Milliseconds)
 ```
 
 ### Sidekiq Integration
@@ -52,7 +142,7 @@ TODO: fill in
 In your sidekiq.rb or other initializer:
 
 ```ruby
-Speedshop::Cloudwatch::Sidekiq.start!
+Speedshop::Cloudwatch::Sidekiq.register
 ```
 
 If you're using Speedshop with ActiveJob, you should use this integration rather than the ActiveJob integration.
@@ -60,10 +150,27 @@ If you're using Speedshop with ActiveJob, you should use this integration rather
 We report the following metrics:
 
 ```
-TODO: fill in
+EnqueuedJobs - Number of jobs currently enqueued (Count)
+ProcessedJobs - Total number of jobs processed (Count)
+FailedJobs - Total number of failed jobs (Count)
+ScheduledJobs - Number of scheduled jobs (Count)
+RetryJobs - Number of jobs in retry queue (Count)
+DeadJobs - Number of dead jobs (Count)
+Workers - Number of Sidekiq workers (Count)
+Processes - Number of Sidekiq processes (Count)
+DefaultQueueLatency - Latency for the default queue (Seconds)
+Capacity - Total concurrency across all processes (Count)
+Utilization - Average utilization across all processes (Percent)
+QueueLatency - Latency for each queue (Seconds) [per queue]
+QueueSize - Size of each queue (Count) [per queue]
 ```
 
+Metrics marked [per queue] include a QueueName dimension.
+Capacity and Utilization metrics may include Tag and/or Hostname dimensions.
+
 ### ActiveJob integration
+
+**Note: if you're using Sidekiq, just use that integration, and don't do the following!**
 
 In your ApplicationJob:
 
@@ -74,5 +181,7 @@ include Speedshop::Cloudwatch::ActiveJob
 We report the following metrics:
 
 ```
-TODO: fill in
+QueueLatency - Time job spent waiting in queue before execution (Seconds)
 ```
+
+This metric includes JobClass and QueueName dimensions.

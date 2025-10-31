@@ -2,14 +2,13 @@
 
 source "https://rubygems.org"
 
-gemspec
+gemspec path: ".."
 
-gem "flay"
-gem "flog"
 gem "irb"
 gem "minitest"
-gem "puma"
+gem "puma", "~> 7.0"
 gem "rack"
+gem "rails", "~> 8.0"
 gem "rake", "~> 13.0"
-gem "sidekiq"
+gem "sidekiq", "~> 8.0"
 gem "standard", ">= 1.35.1"

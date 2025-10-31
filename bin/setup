@@ -5,4 +5,11 @@ set -vx
 
 bundle install
 
+# Start Redis in Docker if port 6379 is free and docker is available
+if ! nc -z localhost 6379 2>/dev/null; then
+  if command -v docker &>/dev/null; then
+    docker run -d --name speedshop-cloudwatch-redis -p 6379:6379 redis 2>/dev/null || true
+  fi
+fi
+
 # Do any other automated setup that you need to do here
