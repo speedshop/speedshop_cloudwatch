@@ -7,5 +7,9 @@
 /spec/reports/
 /tmp/
 prd.md
+dump.rdb
+*.log
+smoketest/tmp/
+smoketest/log/
 TODO.md
 dump.rdb

@@ -1,0 +1,40 @@
+name: Smoketest
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  smoketest:
+    runs-on: ubuntu-latest
+    name: Full Integration Test
+
+    services:
+      redis:
+        image: redis
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+          bundler-cache: true
+          working-directory: smoketest
+
+      - name: Run smoketest
+        run: |
+          cd smoketest
+          ./run_smoketest.sh
