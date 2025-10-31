@@ -1,13 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
-
-begin
-  require "rails"
-rescue LoadError
-  return
-end
-
+require "rails"
 require "speedshop/cloudwatch/railtie"
 
 class RailtieTest < Minitest::Test

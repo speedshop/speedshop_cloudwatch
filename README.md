@@ -72,7 +72,7 @@ Speedshop::Cloudwatch.configure do |config|
 end
 ```
 
-## Manual Initialization (Skipping the Railtie)
+### Rails
 
 By default, if you're using Rails, the gem automatically:
 - Inserts the Rack middleware at the top of the middleware stack
@@ -84,55 +84,10 @@ If you want full control over initialization, add `require: false` to your Gemfi
 gem 'speedshop_cloudwatch', require: false
 ```
 
-Then manually require only the components you need, skipping the railtie:
+Then manually require the core module without the railtie:
 
 ```ruby
-require 'aws-sdk-cloudwatch'
-require 'speedshop/cloudwatch/configuration'
-require 'speedshop/cloudwatch/metric_reporter'
-require 'speedshop/cloudwatch/rack_middleware'
-require 'speedshop/cloudwatch/puma'
-require 'speedshop/cloudwatch/sidekiq'
-require 'speedshop/cloudwatch/active_job'
-
-module Speedshop
-  module Cloudwatch
-    @reporter_mutex = Mutex.new
-
-    class << self
-      attr_reader :reporter_mutex
-
-      def configure
-        @config ||= Configuration.new
-        yield @config if block_given?
-        @config
-      end
-
-      def config
-        @config ||= Configuration.new
-      end
-
-      def reporter
-        return @reporter if defined?(@reporter)
-        @reporter_mutex.synchronize { @reporter = MetricReporter.new(config: config) }
-      end
-
-      def log_info(msg)
-        config.logger.info "Speedshop::Cloudwatch: #{msg}"
-      end
-
-      def log_error(msg, exception = nil)
-        config.logger.error "Speedshop::Cloudwatch: #{msg}"
-        config.logger.debug exception.backtrace.join("\n") if exception&.backtrace
-      end
-    end
-  end
-end
-
-Speedshop::Cloudwatch.configure do |config|
-  config.client = Aws::CloudWatch::Client.new
-  config.interval = 60
-end
+require 'speedshop/cloudwatch'
 
 # Insert middleware manually (if using Rack integration)
 Rails.application.config.middleware.insert_before 0, Speedshop::Cloudwatch::RackMiddleware
@@ -144,8 +99,6 @@ Speedshop::Cloudwatch::Sidekiq.register  # if using Sidekiq
 # Start reporter manually
 Speedshop::Cloudwatch.reporter.start!
 ```
-
-The key is to not require `speedshop/cloudwatch/railtie`, which prevents automatic middleware insertion and reporter startup.
 
 ### Puma Integration
 

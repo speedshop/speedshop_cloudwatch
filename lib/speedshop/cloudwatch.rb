@@ -7,7 +7,6 @@ require "speedshop/cloudwatch/configuration"
 require "speedshop/cloudwatch/metric_reporter"
 require "speedshop/cloudwatch/puma"
 require "speedshop/cloudwatch/rack_middleware"
-require "speedshop/cloudwatch/railtie" if defined?(Rails::Railtie)
 require "speedshop/cloudwatch/sidekiq"
 require "speedshop/cloudwatch/version"
 
