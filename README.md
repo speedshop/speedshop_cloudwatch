@@ -74,9 +74,9 @@ end
 
 ### Rails
 
-By default, if you're using Rails, the gem automatically:
-- Inserts the Rack middleware at the top of the middleware stack
-- Starts the reporter after initialization (but not in console, runner, or asset tasks)
+By default, if you're using Rails, the gem automatically inserts the Rack middleware at the top of the middleware stack.
+
+The reporter starts automatically when the first metric is reported - no manual setup required.
 
 If you want full control over initialization, add `require: false` to your Gemfile:
 
@@ -96,8 +96,7 @@ Rails.application.config.middleware.insert_before 0, Speedshop::Cloudwatch::Rack
 Speedshop::Cloudwatch::Puma.register  # if using Puma
 Speedshop::Cloudwatch::Sidekiq.register  # if using Sidekiq
 
-# Start reporter manually
-Speedshop::Cloudwatch.reporter.start!
+# Reporter starts automatically when first metric is reported
 ```
 
 ### Puma Integration

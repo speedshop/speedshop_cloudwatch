@@ -158,24 +158,25 @@ class SidekiqTest < Minitest::Test
 
   def test_lifecycle_hooks_call_reporter_methods
     client = Minitest::Mock.new
-    client.expect(:put_metric_data, nil, [Hash])
 
-    reporter = Speedshop::Cloudwatch::MetricReporter.new(
-      config: Speedshop::Cloudwatch::Configuration.new.tap do |c|
-        c.client = client
-        c.interval = 60
-        c.logger = Logger.new(nil)
-      end
-    )
+    Speedshop::Cloudwatch.configure do |config|
+      config.client = client
+      config.interval = 60
+      config.logger = Logger.new(nil)
+    end
+
+    reporter = Speedshop::Cloudwatch.reporter
 
     ::Sidekiq.stub(:configure_server, proc { |&block| block.call(@sidekiq_config_mock) }) do
       Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter)
     end
 
+    Speedshop::Cloudwatch.config.enabled[:sidekiq] = false
     @sidekiq_config_mock.callbacks[:startup].call
-    assert reporter.running, "Reporter should be running after startup"
+    assert Speedshop::Cloudwatch.config.enabled[:sidekiq], "Sidekiq should be enabled after startup"
 
     @sidekiq_config_mock.callbacks[:quiet].call
+    refute Speedshop::Cloudwatch.config.enabled[:sidekiq], "Sidekiq should be disabled after quiet"
     refute reporter.running, "Reporter should be stopped after quiet"
   end
 

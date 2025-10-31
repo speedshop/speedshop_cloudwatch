@@ -187,4 +187,46 @@ class MetricReporterTest < Minitest::Test
     assert_equal "ServiceName", dimensions.first[:name]
     assert_equal "myservice-api", dimensions.first[:value]
   end
+
+  def test_lazy_startup_on_first_report
+    refute @reporter.started?
+
+    @reporter.report("test_metric", 42, namespace: "TestApp")
+
+    assert @reporter.started?
+    assert @reporter.thread.alive?
+  end
+
+  def test_lazy_startup_does_not_double_start
+    refute @reporter.started?
+
+    @reporter.report("metric1", 1, namespace: "TestApp")
+    thread1 = @reporter.thread
+
+    @reporter.report("metric2", 2, namespace: "TestApp")
+    thread2 = @reporter.thread
+
+    assert_same thread1, thread2
+  end
+
+  def test_lazy_startup_restarts_after_stop
+    @reporter.report("metric1", 1, namespace: "TestApp")
+    assert @reporter.started?
+
+    @reporter.stop!
+    refute @reporter.started?
+
+    @reporter.report("metric2", 2, namespace: "TestApp")
+    assert @reporter.started?
+  end
+
+  def test_lazy_startup_with_disabled_integration
+    @config.enabled[:puma] = false
+    refute @reporter.started?
+
+    @reporter.report("Workers", 4, namespace: "Puma")
+
+    refute @reporter.started?
+    assert_empty @reporter.queue
+  end
 end

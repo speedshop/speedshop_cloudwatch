@@ -36,12 +36,15 @@ module Speedshop
       end
 
       def stop!
+        thread_to_join = nil
         @mutex.synchronize do
+          return unless @running
           Speedshop::Cloudwatch.log_info("Stopping metric reporter")
           @running = false
-          @thread&.join
+          thread_to_join = @thread
           @thread = @pid = nil
         end
+        thread_to_join&.join
       end
 
       def report(metric_name, value, namespace:, unit: "None", dimensions: [])
@@ -54,6 +57,8 @@ module Speedshop
           @queue << {metric_name: metric_name, value: value, namespace: namespace, unit: unit,
                      dimensions: all_dimensions, timestamp: Time.now}
         end
+
+        start! unless started?
       end
 
       def register_collector(&block)
