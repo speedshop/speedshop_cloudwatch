@@ -102,4 +102,13 @@ class ConfigurationTest < Minitest::Test
     @config.logger = custom_logger
     assert_same custom_logger, @config.logger
   end
+
+  def test_dimensions_defaults_to_empty_hash
+    assert_equal({}, @config.dimensions)
+  end
+
+  def test_allows_setting_custom_dimensions
+    @config.dimensions = {ServiceName: "myservice-api", Environment: "production"}
+    assert_equal({ServiceName: "myservice-api", Environment: "production"}, @config.dimensions)
+  end
 end

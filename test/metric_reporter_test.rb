@@ -142,4 +142,48 @@ class MetricReporterTest < Minitest::Test
 
     refute @reporter.started?
   end
+
+  def test_adds_custom_dimensions_to_metrics
+    @config.dimensions = {ServiceName: "myservice-api", Environment: "production"}
+    @reporter.report("test_metric", 42, namespace: "TestApp", dimensions: [{name: "Region", value: "us-east-1"}])
+
+    queue = @reporter.queue
+    assert_equal 1, queue.size
+    dimensions = queue.first[:dimensions]
+    assert_equal 3, dimensions.size
+
+    dimension_names = dimensions.map { |d| d[:name] }
+    assert_includes dimension_names, "Region"
+    assert_includes dimension_names, "ServiceName"
+    assert_includes dimension_names, "Environment"
+
+    service_dim = dimensions.find { |d| d[:name] == "ServiceName" }
+    assert_equal "myservice-api", service_dim[:value]
+
+    env_dim = dimensions.find { |d| d[:name] == "Environment" }
+    assert_equal "production", env_dim[:value]
+  end
+
+  def test_works_without_custom_dimensions
+    @reporter.report("test_metric", 42, namespace: "TestApp", dimensions: [{name: "Region", value: "us-east-1"}])
+
+    queue = @reporter.queue
+    assert_equal 1, queue.size
+    dimensions = queue.first[:dimensions]
+    assert_equal 1, dimensions.size
+    assert_equal "Region", dimensions.first[:name]
+    assert_equal "us-east-1", dimensions.first[:value]
+  end
+
+  def test_custom_dimensions_with_no_metric_dimensions
+    @config.dimensions = {ServiceName: "myservice-api"}
+    @reporter.report("test_metric", 42, namespace: "TestApp")
+
+    queue = @reporter.queue
+    assert_equal 1, queue.size
+    dimensions = queue.first[:dimensions]
+    assert_equal 1, dimensions.size
+    assert_equal "ServiceName", dimensions.first[:name]
+    assert_equal "myservice-api", dimensions.first[:value]
+  end
 end

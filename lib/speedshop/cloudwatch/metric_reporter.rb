@@ -48,9 +48,11 @@ module Speedshop
         integration = @config.namespaces.key(namespace)
         return if integration && !metric_allowed?(integration, metric_name)
 
+        all_dimensions = dimensions + custom_dimensions
+
         @mutex.synchronize do
           @queue << {metric_name: metric_name, value: value, namespace: namespace, unit: unit,
-                     dimensions: dimensions, timestamp: Time.now}
+                     dimensions: all_dimensions, timestamp: Time.now}
         end
       end
 
@@ -91,6 +93,10 @@ module Speedshop
 
       def metric_allowed?(integration, metric_name)
         @config.enabled[integration] && @config.metrics[integration].include?(metric_name.to_sym)
+      end
+
+      def custom_dimensions
+        @config.dimensions.map { |name, value| {name: name.to_s, value: value.to_s} }
       end
 
       def log_info(msg)

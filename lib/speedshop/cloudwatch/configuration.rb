@@ -5,7 +5,7 @@ require "logger"
 module Speedshop
   module Cloudwatch
     class Configuration
-      attr_accessor :interval, :client, :enabled, :metrics, :namespaces, :logger, :sidekiq_queues
+      attr_accessor :interval, :client, :enabled, :metrics, :namespaces, :logger, :sidekiq_queues, :dimensions
 
       def initialize
         @interval = 60
@@ -22,6 +22,7 @@ module Speedshop
         }
         @namespaces = {puma: "Puma", sidekiq: "Sidekiq", rack: "Rack", active_job: "ActiveJob"}
         @sidekiq_queues = nil
+        @dimensions = {}
         @logger = (defined?(Rails) && Rails.respond_to?(:logger)) ? Rails.logger : Logger.new($stdout)
       end
     end
