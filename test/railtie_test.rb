@@ -97,6 +97,23 @@ class RailtieTest < Minitest::Test
     end
   end
 
+  def test_middleware_is_inserted
+    app = Minitest::Mock.new
+    config = Minitest::Mock.new
+    middleware = Minitest::Mock.new
+
+    config.expect(:middleware, middleware)
+    app.expect(:config, config)
+    middleware.expect(:insert_before, nil, [0, Speedshop::Cloudwatch::RackMiddleware])
+
+    initializer = Speedshop::Cloudwatch::Railtie.initializers.find { |i| i.name == "speedshop.cloudwatch.insert_middleware" }
+    initializer.block.call(app)
+
+    app.verify
+    config.verify
+    middleware.verify
+  end
+
   private
 
   def build_rake_double(tasks)

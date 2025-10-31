@@ -3,6 +3,10 @@
 module Speedshop
   module Cloudwatch
     class Railtie < ::Rails::Railtie
+      initializer "speedshop.cloudwatch.insert_middleware", before: :build_middleware_stack do |app|
+        app.config.middleware.insert_before 0, Speedshop::Cloudwatch::RackMiddleware
+      end
+
       initializer "speedshop.cloudwatch.start_reporter" do
         config.after_initialize do
           next if caller.any? { |c| c.include?("console_command.rb") || c.include?("runner_command.rb") }

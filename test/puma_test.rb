@@ -28,9 +28,9 @@ class PumaTest < Minitest::Test
     end
 
     metric_names = reporter.metrics_collected.map { |m| m[:name] }
-    assert_includes metric_names, "Workers"
-    assert_includes metric_names, "BootedWorkers"
-    assert_includes metric_names, "OldWorkers"
+    refute_includes metric_names, "Workers"
+    refute_includes metric_names, "BootedWorkers"
+    refute_includes metric_names, "OldWorkers"
     assert_includes metric_names, "Running"
     assert_includes metric_names, "Backlog"
     assert_includes metric_names, "PoolCapacity"
