@@ -146,4 +146,24 @@ class ActiveJobTest < Minitest::Test
 
     assert_equal initial_size, queue.size
   end
+
+  def test_logs_error_when_collection_fails
+    error_logged = false
+    logger = Object.new
+    logger.define_singleton_method(:error) { |msg| error_logged = true if msg.include?("Failed to collect ActiveJob metrics") }
+    logger.define_singleton_method(:debug) { |msg| }
+    logger.define_singleton_method(:info) { |msg| }
+
+    Speedshop::Cloudwatch.configure do |config|
+      config.logger = logger
+    end
+
+    job = TestJob.new("test_arg")
+    job.stub :enqueued_at, -> { raise "boom" } do
+      result = job.perform_now
+      assert_equal "test_arg", result
+    end
+
+    assert error_logged, "Expected error to be logged"
+  end
 end

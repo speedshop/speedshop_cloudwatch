@@ -229,4 +229,28 @@ class SidekiqTest < Minitest::Test
     end
     assert_equal 0, process_utilization_metrics.size
   end
+
+  def test_logs_error_when_collection_fails
+    error_logged = false
+    logger = Object.new
+    logger.define_singleton_method(:error) { |msg| error_logged = true if msg.include?("Failed to collect Sidekiq metrics") }
+    logger.define_singleton_method(:debug) { |msg| }
+    logger.define_singleton_method(:info) { |msg| }
+
+    Speedshop::Cloudwatch.configure do |config|
+      config.logger = logger
+    end
+
+    reporter = TestDoubles::ReporterDouble.new
+
+    ::Sidekiq::Stats.stub(:new, -> { raise "boom" }) do
+      ::Sidekiq.stub(:configure_server, proc { |&block| block.call(@sidekiq_config_mock) }) do
+        Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter)
+        collector = reporter.collectors.last
+        collector.call
+      end
+    end
+
+    assert error_logged, "Expected error to be logged"
+  end
 end

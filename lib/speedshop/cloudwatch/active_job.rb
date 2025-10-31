@@ -15,8 +15,8 @@ module Speedshop
             dimensions = [{name: "JobClass", value: self.class.name}, {name: "QueueName", value: queue_name}]
             Cloudwatch.reporter.report("QueueLatency", queue_time, namespace: namespace, unit: "Seconds", dimensions: dimensions)
           end
-        rescue
-          nil
+        rescue => e
+          Speedshop::Cloudwatch.log_error("Failed to collect ActiveJob metrics: #{e.message}", e)
         end
         yield
       end

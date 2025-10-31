@@ -113,4 +113,26 @@ class PumaTest < Minitest::Test
 
     assert reporter.metrics_collected.all? { |m| m[:namespace] == "MyApp/Puma" }, "Expected all metrics to use 'MyApp/Puma' namespace"
   end
+
+  def test_logs_error_when_collection_fails
+    error_logged = false
+    logger = Object.new
+    logger.define_singleton_method(:error) { |msg| error_logged = true if msg.include?("Failed to collect Puma metrics") }
+    logger.define_singleton_method(:debug) { |msg| }
+    logger.define_singleton_method(:info) { |msg| }
+
+    Speedshop::Cloudwatch.configure do |config|
+      config.logger = logger
+    end
+
+    reporter = TestDoubles::ReporterDouble.new
+
+    ::Puma.stub(:stats_hash, -> { raise "boom" }) do
+      Speedshop::Cloudwatch::Puma.register(namespace: "Puma", reporter: reporter)
+      collector = reporter.collectors.last
+      collector.call
+    end
+
+    assert error_logged, "Expected error to be logged"
+  end
 end

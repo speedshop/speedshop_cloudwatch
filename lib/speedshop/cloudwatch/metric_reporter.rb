@@ -20,8 +20,8 @@ module Speedshop
 
         @mutex.synchronize do
           return if started?
-          return log_info("No integrations enabled, not starting reporter") unless @config.enabled.values.any?
-          log_info("Starting metric reporter (interval: #{@config.interval}s)")
+          return Speedshop::Cloudwatch.log_info("No integrations enabled, not starting reporter") unless @config.enabled.values.any?
+          Speedshop::Cloudwatch.log_info("Starting metric reporter (interval: #{@config.interval}s)")
           @pid = Process.pid
           @running = true
           @thread = Thread.new do
@@ -37,7 +37,7 @@ module Speedshop
 
       def stop!
         @mutex.synchronize do
-          log_info("Stopping metric reporter")
+          Speedshop::Cloudwatch.log_info("Stopping metric reporter")
           @running = false
           @thread&.join
           @thread = @pid = nil
@@ -68,14 +68,14 @@ module Speedshop
           @collectors.each { |c|
             begin
               c.call
-            rescue
-              log_error("Collector error: #{$!.message}")
+            rescue => e
+              Speedshop::Cloudwatch.log_error("Collector error: #{e.message}", e)
             end
           }
           flush_metrics
         end
       rescue => e
-        log_error("MetricReporter error: #{e.message}")
+        Speedshop::Cloudwatch.log_error("MetricReporter error: #{e.message}", e)
       end
 
       def flush_metrics
@@ -88,7 +88,7 @@ module Speedshop
           @config.client.put_metric_data(namespace: namespace, metric_data: metric_data)
         end
       rescue => e
-        log_error("Failed to send metrics: #{e.message}")
+        Speedshop::Cloudwatch.log_error("Failed to send metrics: #{e.message}", e)
       end
 
       def metric_allowed?(integration, metric_name)
@@ -97,15 +97,6 @@ module Speedshop
 
       def custom_dimensions
         @config.dimensions.map { |name, value| {name: name.to_s, value: value.to_s} }
-      end
-
-      def log_info(msg)
-        @config.logger.info "Speedshop::Cloudwatch: #{msg}"
-      end
-
-      def log_error(msg)
-        @config.logger.error "Speedshop::Cloudwatch: #{msg}"
-        @config.logger.debug $!.backtrace.join("\n") if $!
       end
     end
   end

@@ -16,8 +16,8 @@ module Speedshop
             namespace = Speedshop::Cloudwatch.config.namespaces[:rack]
             Speedshop::Cloudwatch.reporter.report("RequestQueueTime", queue_time, namespace: namespace, unit: "Milliseconds")
           end
-        rescue
-          nil
+        rescue => e
+          Speedshop::Cloudwatch.log_error("Failed to collect Rack metrics: #{e.message}", e)
         end
         @app.call(env)
       end

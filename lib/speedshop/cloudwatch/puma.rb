@@ -22,6 +22,8 @@ module Speedshop
 
           workers = stats[:worker_status] ? worker_statuses(stats) : [[stats, 0]]
           workers.each { |worker_stats, idx| report_worker(worker_stats, idx) }
+        rescue => e
+          Speedshop::Cloudwatch.log_error("Failed to collect Puma metrics: #{e.message}", e)
         end
 
         def worker_statuses(stats)

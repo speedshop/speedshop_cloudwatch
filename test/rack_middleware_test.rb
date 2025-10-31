@@ -86,4 +86,28 @@ class RackMiddlewareTest < Minitest::Test
 
     assert_equal "MyApp/Rack", reported_namespace
   end
+
+  def test_logs_error_when_collection_fails
+    error_logged = false
+    logger = Object.new
+    logger.define_singleton_method(:error) { |msg| error_logged = true if msg.include?("Failed to collect Rack metrics") }
+    logger.define_singleton_method(:debug) { |msg| }
+    logger.define_singleton_method(:info) { |msg| }
+
+    Speedshop::Cloudwatch.configure do |config|
+      config.client = @client
+      config.logger = logger
+    end
+
+    @middleware = Speedshop::Cloudwatch::RackMiddleware.new(@app)
+
+    reporter = Speedshop::Cloudwatch.reporter
+    reporter.stub :report, ->(*) { raise "boom" } do
+      env = {"HTTP_X_REQUEST_START" => "t=#{(Time.now.to_f * 1000) - 100}"}
+      status, _headers, _body = @middleware.call(env)
+      assert_equal 200, status
+    end
+
+    assert error_logged, "Expected error to be logged"
+  end
 end

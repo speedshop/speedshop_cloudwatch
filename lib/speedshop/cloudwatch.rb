@@ -33,6 +33,15 @@ module Speedshop
         return @reporter if defined?(@reporter)
         @reporter_mutex.synchronize { @reporter = MetricReporter.new(config: config) }
       end
+
+      def log_info(msg)
+        config.logger.info "Speedshop::Cloudwatch: #{msg}"
+      end
+
+      def log_error(msg, exception = nil)
+        config.logger.error "Speedshop::Cloudwatch: #{msg}"
+        config.logger.debug exception.backtrace.join("\n") if exception&.backtrace
+      end
     end
   end
 end

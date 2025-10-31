@@ -9,6 +9,7 @@ class MetricReporterTest < Minitest::Test
     @config.interval = 60
     @config.client = @client
     @config.logger = Logger.new(nil)
+    Speedshop::Cloudwatch.instance_variable_set(:@config, @config)
     @reporter = Speedshop::Cloudwatch::MetricReporter.new(config: @config)
   end
 
