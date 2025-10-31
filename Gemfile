@@ -4,6 +4,8 @@ source "https://rubygems.org"
 
 gemspec
 
+gem "flay"
+gem "flog"
 gem "irb"
 gem "minitest"
 gem "puma"
