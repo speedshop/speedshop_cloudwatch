@@ -72,6 +72,41 @@ Speedshop::Cloudwatch.configure do |config|
 end
 ```
 
+## Manual Initialization
+
+By default, if you're using Rails, the gem automatically:
+- Inserts the Rack middleware at the top of the middleware stack
+- Starts the reporter after initialization (but not in console, runner, or asset tasks)
+
+If you want full control over initialization, add `require: false` to your Gemfile:
+
+```ruby
+gem 'speedshop_cloudwatch', require: false
+```
+
+Then manually require and initialize the components you need:
+
+```ruby
+require 'speedshop/cloudwatch'
+
+Speedshop::Cloudwatch.configure do |config|
+  config.client = Aws::CloudWatch::Client.new
+  config.interval = 60
+end
+
+# Insert middleware manually (if using Rack integration)
+Rails.application.config.middleware.insert_before 0, Speedshop::Cloudwatch::RackMiddleware
+
+# Register integrations
+Speedshop::Cloudwatch::Puma.register  # if using Puma
+Speedshop::Cloudwatch::Sidekiq.register  # if using Sidekiq
+
+# Start reporter manually
+Speedshop::Cloudwatch.reporter.start!
+```
+
+For non-Rails Rack applications, you were already doing manual setup, so nothing changes.
+
 ### Puma Integration
 
 Add to your `config/puma.rb`:
