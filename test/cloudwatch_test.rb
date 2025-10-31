@@ -37,4 +37,9 @@ class CloudwatchTest < Minitest::Test
     reporter = Speedshop::Cloudwatch.reporter
     assert_kind_of Speedshop::Cloudwatch::MetricReporter, reporter
   end
+
+  def test_reporter_mutex_created_at_require_time
+    mutex = Speedshop::Cloudwatch.instance_variable_get(:@reporter_mutex)
+    assert_kind_of Mutex, mutex
+  end
 end

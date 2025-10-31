@@ -14,6 +14,7 @@ require "speedshop/cloudwatch/version"
 module Speedshop
   module Cloudwatch
     class Error < StandardError; end
+    @reporter_mutex = Mutex.new
 
     class << self
       def configure
@@ -27,8 +28,8 @@ module Speedshop
       end
 
       def reporter
-        return @reporter if @reporter
-        (@reporter_mutex ||= Mutex.new).synchronize { @reporter ||= MetricReporter.new(config: config) }
+        return @reporter if defined?(@reporter)
+        @reporter_mutex.synchronize { @reporter = MetricReporter.new(config: config) }
       end
     end
   end
