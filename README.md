@@ -118,7 +118,7 @@ RequestQueueTime - Time spent waiting in the request queue (Milliseconds)
 In your sidekiq.rb or other initializer:
 
 ```ruby
-Speedshop::Cloudwatch::Sidekiq.start!
+Speedshop::Cloudwatch::Sidekiq.register
 ```
 
 If you're using Speedshop with ActiveJob, you should use this integration rather than the ActiveJob integration.

@@ -3,10 +3,15 @@
 module Speedshop
   module Cloudwatch
     class Railtie < ::Rails::Railtie
+      initializer "speedshop.cloudwatch.insert_middleware", before: :build_middleware_stack do |app|
+        next unless Speedshop::Cloudwatch.config.enabled[:rack]
+        app.config.middleware.use Speedshop::Cloudwatch::RackMiddleware
+      end
+
       initializer "speedshop.cloudwatch.start_reporter" do
         config.after_initialize do
           next if caller.any? { |c| c.include?("console_command.rb") || c.include?("runner_command.rb") }
-          next if in_rake_task?
+          next if Railtie.in_rake_task?
           Speedshop::Cloudwatch.reporter.start!
         end
       end
