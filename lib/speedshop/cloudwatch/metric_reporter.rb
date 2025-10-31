@@ -3,6 +3,8 @@
 module Speedshop
   module Cloudwatch
     class MetricReporter
+      attr_reader :collectors, :queue, :running, :thread
+
       def initialize(config:)
         raise ArgumentError, "CloudWatch client must be provided" unless config.client
         @config = config

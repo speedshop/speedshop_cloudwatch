@@ -122,7 +122,7 @@ class ActiveJobTest < Minitest::Test
     job.enqueued_at = Time.now.to_f - 1.0
 
     reporter = Speedshop::Cloudwatch.reporter
-    queue = reporter.instance_variable_get(:@queue)
+    queue = reporter.queue
     initial_size = queue.size
 
     job.perform_now
@@ -139,7 +139,7 @@ class ActiveJobTest < Minitest::Test
     job.enqueued_at = Time.now.to_f - 1.0
 
     reporter = Speedshop::Cloudwatch.reporter
-    queue = reporter.instance_variable_get(:@queue)
+    queue = reporter.queue
     initial_size = queue.size
 
     job.perform_now

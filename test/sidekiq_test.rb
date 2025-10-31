@@ -15,12 +15,7 @@ class SidekiqTest < Minitest::Test
     end
     Sidekiq.redis(&:flushdb)
 
-    @lifecycle_callbacks = {}
-    callbacks = @lifecycle_callbacks
-    @sidekiq_config_mock = Object.new
-    @sidekiq_config_mock.define_singleton_method(:on) do |event, &block|
-      callbacks[event] = block
-    end
+    @sidekiq_config_mock = TestDoubles::SidekiqConfigDouble.new
   end
 
   def teardown
@@ -45,7 +40,7 @@ class SidekiqTest < Minitest::Test
       Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter)
     end
 
-    assert_equal 1, reporter.instance_variable_get(:@collectors).size
+    assert_equal 1, reporter.collectors.size
   end
 
   def test_lifecycle_hooks_registered_for_oss
@@ -62,17 +57,17 @@ class SidekiqTest < Minitest::Test
       Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter)
     end
 
-    assert @lifecycle_callbacks.key?(:startup), "Expected :startup hook to be registered"
-    assert @lifecycle_callbacks.key?(:quiet), "Expected :quiet hook to be registered"
-    assert @lifecycle_callbacks.key?(:shutdown), "Expected :shutdown hook to be registered"
-    refute @lifecycle_callbacks.key?(:leader), "Expected :leader hook NOT to be registered for OSS"
+    assert @sidekiq_config_mock.callbacks.key?(:startup), "Expected :startup hook to be registered"
+    assert @sidekiq_config_mock.callbacks.key?(:quiet), "Expected :quiet hook to be registered"
+    assert @sidekiq_config_mock.callbacks.key?(:shutdown), "Expected :shutdown hook to be registered"
+    refute @sidekiq_config_mock.callbacks.key?(:leader), "Expected :leader hook NOT to be registered for OSS"
   end
 
   def test_filters_queues_when_configured
     queues = [
-      double_queue("critical", 1, 1.5),
-      double_queue("default", 2, 0.5),
-      double_queue("low_priority", 3, 2.0)
+      TestDoubles::QueueDouble.new("critical", 1, 1.5),
+      TestDoubles::QueueDouble.new("default", 2, 0.5),
+      TestDoubles::QueueDouble.new("low_priority", 3, 2.0)
     ]
 
     Speedshop::Cloudwatch.configure do |config|
@@ -82,26 +77,17 @@ class SidekiqTest < Minitest::Test
       config.sidekiq_queues = ["critical", "default"]
     end
 
-    metrics_collected = []
-    test_reporter = Object.new
-    test_reporter.define_singleton_method(:report) do |metric_name, value, **options|
-      metrics_collected << {name: metric_name, value: value, **options}
-    end
-    test_reporter.define_singleton_method(:register_collector) do |&block|
-      @collectors ||= []
-      @collectors << block
-    end
-    test_reporter.instance_variable_set(:@collectors, [])
+    test_reporter = TestDoubles::ReporterDouble.new
 
     ::Sidekiq::Queue.stub(:all, queues) do
       ::Sidekiq.stub(:configure_server, proc { |&block| block.call(@sidekiq_config_mock) }) do
         Speedshop::Cloudwatch::Sidekiq.register(reporter: test_reporter)
-        collector = test_reporter.instance_variable_get(:@collectors).last
+        collector = test_reporter.collectors.last
         collector.call
       end
     end
 
-    queue_metrics = metrics_collected.select { |m| m[:dimensions]&.any? { |d| d[:name] == "QueueName" } }
+    queue_metrics = test_reporter.metrics_collected.select { |m| m[:dimensions]&.any? { |d| d[:name] == "QueueName" } }
     queue_names = queue_metrics.map { |m| m[:dimensions].find { |d| d[:name] == "QueueName" }[:value] }.uniq
 
     assert_includes queue_names, "critical"
@@ -109,19 +95,11 @@ class SidekiqTest < Minitest::Test
     refute_includes queue_names, "low_priority"
   end
 
-  def double_queue(name, size, latency)
-    queue = Object.new
-    queue.define_singleton_method(:name) { name }
-    queue.define_singleton_method(:size) { size }
-    queue.define_singleton_method(:latency) { latency }
-    queue
-  end
-
   def test_monitors_all_queues_by_default
     queues = [
-      double_queue("critical", 1, 1.5),
-      double_queue("default", 2, 0.5),
-      double_queue("low_priority", 3, 2.0)
+      TestDoubles::QueueDouble.new("critical", 1, 1.5),
+      TestDoubles::QueueDouble.new("default", 2, 0.5),
+      TestDoubles::QueueDouble.new("low_priority", 3, 2.0)
     ]
 
     Speedshop::Cloudwatch.configure do |config|
@@ -131,21 +109,17 @@ class SidekiqTest < Minitest::Test
       config.sidekiq_queues = nil
     end
 
-    metrics_collected = []
-    reporter = Speedshop::Cloudwatch.reporter
-    reporter.define_singleton_method(:report) do |metric_name, value, **options|
-      metrics_collected << {name: metric_name, value: value, **options}
-    end
+    test_reporter = TestDoubles::ReporterDouble.new
 
     ::Sidekiq::Queue.stub(:all, queues) do
       ::Sidekiq.stub(:configure_server, proc { |&block| block.call(@sidekiq_config_mock) }) do
-        Speedshop::Cloudwatch::Sidekiq.register(reporter: reporter)
-        collector = reporter.instance_variable_get(:@collectors).last
+        Speedshop::Cloudwatch::Sidekiq.register(reporter: test_reporter)
+        collector = test_reporter.collectors.last
         collector.call
       end
     end
 
-    queue_metrics = metrics_collected.select { |m| m[:dimensions]&.any? { |d| d[:name] == "QueueName" } }
+    queue_metrics = test_reporter.metrics_collected.select { |m| m[:dimensions]&.any? { |d| d[:name] == "QueueName" } }
     queue_names = queue_metrics.map { |m| m[:dimensions].find { |d| d[:name] == "QueueName" }[:value] }.uniq
 
     assert_includes queue_names, "critical"
@@ -171,10 +145,10 @@ class SidekiqTest < Minitest::Test
         Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter)
       end
 
-      assert @lifecycle_callbacks.key?(:leader), "Expected :leader hook to be registered for Enterprise"
-      assert @lifecycle_callbacks.key?(:quiet), "Expected :quiet hook to be registered"
-      assert @lifecycle_callbacks.key?(:shutdown), "Expected :shutdown hook to be registered"
-      refute @lifecycle_callbacks.key?(:startup), "Expected :startup hook NOT to be registered for Enterprise"
+      assert @sidekiq_config_mock.callbacks.key?(:leader), "Expected :leader hook to be registered for Enterprise"
+      assert @sidekiq_config_mock.callbacks.key?(:quiet), "Expected :quiet hook to be registered"
+      assert @sidekiq_config_mock.callbacks.key?(:shutdown), "Expected :shutdown hook to be registered"
+      refute @sidekiq_config_mock.callbacks.key?(:startup), "Expected :startup hook NOT to be registered for Enterprise"
     ensure
       ::Sidekiq.send(:remove_const, :Enterprise)
     end
@@ -196,37 +170,30 @@ class SidekiqTest < Minitest::Test
       Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter)
     end
 
-    @lifecycle_callbacks[:startup].call
-    assert reporter.instance_variable_get(:@running), "Reporter should be running after startup"
+    @sidekiq_config_mock.callbacks[:startup].call
+    assert reporter.running, "Reporter should be running after startup"
 
-    @lifecycle_callbacks[:quiet].call
-    refute reporter.instance_variable_get(:@running), "Reporter should be stopped after quiet"
+    @sidekiq_config_mock.callbacks[:quiet].call
+    refute reporter.running, "Reporter should be stopped after quiet"
   end
 
   def test_collects_all_metrics_with_real_sidekiq_data
-    client = Minitest::Mock.new
-    metrics_collected = []
-
-    reporter = Speedshop::Cloudwatch::MetricReporter.new(
-      config: Speedshop::Cloudwatch::Configuration.new.tap do |c|
-        c.client = client
-        c.interval = 60
-        c.logger = Logger.new(nil)
-      end
-    )
-
-    reporter.define_singleton_method(:report) do |metric_name, value, **options|
-      metrics_collected << {name: metric_name, value: value, **options}
+    Speedshop::Cloudwatch.configure do |config|
+      config.client = Minitest::Mock.new
+      config.interval = 60
+      config.logger = Logger.new(nil)
     end
+
+    reporter = TestDoubles::ReporterDouble.new
 
     ::Sidekiq.stub(:configure_server, proc { |&block| block.call(@sidekiq_config_mock) }) do
       Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter, process_metrics: true)
 
-      collector = reporter.instance_variable_get(:@collectors).last
+      collector = reporter.collectors.last
       collector.call
     end
 
-    metric_names = metrics_collected.map { |m| m[:name] }
+    metric_names = reporter.metrics_collected.map { |m| m[:name] }
     assert_includes metric_names, "EnqueuedJobs"
     assert_includes metric_names, "ProcessedJobs"
     assert_includes metric_names, "FailedJobs"
@@ -240,29 +207,22 @@ class SidekiqTest < Minitest::Test
   end
 
   def test_process_metrics_can_be_disabled
-    client = Minitest::Mock.new
-    metrics_collected = []
-
-    reporter = Speedshop::Cloudwatch::MetricReporter.new(
-      config: Speedshop::Cloudwatch::Configuration.new.tap do |c|
-        c.client = client
-        c.interval = 60
-        c.logger = Logger.new(nil)
-      end
-    )
-
-    reporter.define_singleton_method(:report) do |metric_name, value, **options|
-      metrics_collected << {name: metric_name, value: value, **options}
+    Speedshop::Cloudwatch.configure do |config|
+      config.client = Minitest::Mock.new
+      config.interval = 60
+      config.logger = Logger.new(nil)
     end
+
+    reporter = TestDoubles::ReporterDouble.new
 
     ::Sidekiq.stub(:configure_server, proc { |&block| block.call(@sidekiq_config_mock) }) do
       Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter, process_metrics: false)
 
-      collector = reporter.instance_variable_get(:@collectors).last
+      collector = reporter.collectors.last
       collector.call
     end
 
-    process_utilization_metrics = metrics_collected.select do |m|
+    process_utilization_metrics = reporter.metrics_collected.select do |m|
       m[:name] == "Utilization" && m[:dimensions]&.any? { |d| d[:name] == "Hostname" }
     end
     assert_equal 0, process_utilization_metrics.size

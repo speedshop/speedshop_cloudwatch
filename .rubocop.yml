@@ -1,9 +1,14 @@
-# For available configuration options, see:
-#   https://github.com/standardrb/standard
-ruby_version: 2.7
+# This is used by standardrb
 
 require:
+  - standard
   - ./.rubocop/forbidden_methods.rb
+
+inherit_gem:
+  standard: config/base.yml
+
+AllCops:
+  TargetRubyVersion: 2.7
 
 Layout/LineLength:
   Max: 120

@@ -100,10 +100,6 @@ class RailtieTest < Minitest::Test
   private
 
   def build_rake_double(tasks)
-    app_double = Struct.new(:top_level_tasks).new(tasks)
-    Class.new do
-      define_singleton_method(:respond_to?) { |method| method == :application }
-      define_singleton_method(:application) { app_double }
-    end
+    TestDoubles::RakeDouble.new(tasks)
   end
 end

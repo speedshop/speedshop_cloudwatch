@@ -30,7 +30,7 @@ class MetricReporterTest < Minitest::Test
     @config.enabled[:puma] = false
     @reporter.report("workers", 4, namespace: "Puma")
 
-    queue = @reporter.instance_variable_get(:@queue)
+    queue = @reporter.queue
     assert_empty queue
   end
 
@@ -39,7 +39,7 @@ class MetricReporterTest < Minitest::Test
     @reporter.report("workers", 4, namespace: "Puma")
     @reporter.report("booted_workers", 4, namespace: "Puma")
 
-    queue = @reporter.instance_variable_get(:@queue)
+    queue = @reporter.queue
     assert_equal 1, queue.size
     assert_equal "workers", queue.first[:metric_name]
   end
@@ -48,7 +48,7 @@ class MetricReporterTest < Minitest::Test
     @config.enabled[:sidekiq] = false
     @reporter.report("EnqueuedJobs", 10, namespace: "Sidekiq")
 
-    queue = @reporter.instance_variable_get(:@queue)
+    queue = @reporter.queue
     assert_empty queue
   end
 
@@ -58,7 +58,7 @@ class MetricReporterTest < Minitest::Test
     @reporter.report("ProcessedJobs", 100, namespace: "Sidekiq")
     @reporter.report("QueueLatency", 5.2, namespace: "Sidekiq")
 
-    queue = @reporter.instance_variable_get(:@queue)
+    queue = @reporter.queue
     assert_equal 2, queue.size
     metric_names = queue.map { |m| m[:metric_name] }
     assert_includes metric_names, "EnqueuedJobs"
@@ -70,7 +70,7 @@ class MetricReporterTest < Minitest::Test
     @config.enabled[:rack] = false
     @reporter.report("request_queue_time", 50, namespace: "Rack")
 
-    queue = @reporter.instance_variable_get(:@queue)
+    queue = @reporter.queue
     assert_empty queue
   end
 
@@ -78,14 +78,14 @@ class MetricReporterTest < Minitest::Test
     @config.enabled[:active_job] = false
     @reporter.report("job_queue_time", 2.5, namespace: "ActiveJob")
 
-    queue = @reporter.instance_variable_get(:@queue)
+    queue = @reporter.queue
     assert_empty queue
   end
 
   def test_allows_unknown_namespaces
     @reporter.report("custom_metric", 42, namespace: "CustomNamespace")
 
-    queue = @reporter.instance_variable_get(:@queue)
+    queue = @reporter.queue
     assert_equal 1, queue.size
   end
 
@@ -97,7 +97,7 @@ class MetricReporterTest < Minitest::Test
 
     @reporter.start!
 
-    assert_nil @reporter.instance_variable_get(:@thread)
-    refute @reporter.instance_variable_get(:@running)
+    assert_nil @reporter.thread
+    refute @reporter.running
   end
 end

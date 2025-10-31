@@ -17,6 +17,8 @@ module Speedshop
     @reporter_mutex = Mutex.new
 
     class << self
+      attr_reader :reporter_mutex
+
       def configure
         @config ||= Configuration.new
         yield @config if block_given?
