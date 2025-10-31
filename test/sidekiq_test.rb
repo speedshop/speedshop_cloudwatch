@@ -83,15 +83,20 @@ class SidekiqTest < Minitest::Test
     end
 
     metrics_collected = []
-    reporter = Speedshop::Cloudwatch.reporter
-    reporter.define_singleton_method(:report) do |metric_name, value, **options|
+    test_reporter = Object.new
+    test_reporter.define_singleton_method(:report) do |metric_name, value, **options|
       metrics_collected << {name: metric_name, value: value, **options}
     end
+    test_reporter.define_singleton_method(:register_collector) do |&block|
+      @collectors ||= []
+      @collectors << block
+    end
+    test_reporter.instance_variable_set(:@collectors, [])
 
     ::Sidekiq::Queue.stub(:all, queues) do
       ::Sidekiq.stub(:configure_server, proc { |&block| block.call(@sidekiq_config_mock) }) do
-        Speedshop::Cloudwatch::Sidekiq.register(reporter: reporter)
-        collector = reporter.instance_variable_get(:@collectors).last
+        Speedshop::Cloudwatch::Sidekiq.register(reporter: test_reporter)
+        collector = test_reporter.instance_variable_get(:@collectors).last
         collector.call
       end
     end
