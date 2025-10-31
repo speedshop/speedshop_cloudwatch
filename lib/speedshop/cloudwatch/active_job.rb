@@ -13,7 +13,7 @@ module Speedshop
             queue_time = Time.now.to_f - enqueued_at
             namespace = Speedshop::Cloudwatch.config.namespaces[:active_job]
             dimensions = [{name: "JobClass", value: self.class.name}, {name: "QueueName", value: queue_name}]
-            Cloudwatch.reporter.report("JobQueueTime", queue_time, namespace: namespace, unit: "Seconds", dimensions: dimensions)
+            Cloudwatch.reporter.report("QueueLatency", queue_time, namespace: namespace, unit: "Seconds", dimensions: dimensions)
           end
         rescue
           nil

@@ -38,7 +38,7 @@ class ConfigurationTest < Minitest::Test
   end
 
   def test_has_default_active_job_metrics
-    expected = [:JobQueueTime]
+    expected = [:QueueLatency]
     assert_equal expected, @config.metrics[:active_job]
   end
 

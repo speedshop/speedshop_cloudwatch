@@ -27,7 +27,7 @@ config.metrics[:rack] = [:RequestQueueTime]
 
 **ActiveJob:**
 ```ruby
-config.metrics[:active_job] = [:JobQueueTime]
+config.metrics[:active_job] = [:QueueLatency]
 ```
 
 This gem is for **infrastructure and queue metrics**, not application performance metrics, like response times, job execution times, or error rates. Use your APM for that stuff.
@@ -157,7 +157,7 @@ include Speedshop::Cloudwatch::ActiveJob
 We report the following metrics:
 
 ```
-JobQueueTime - Time job spent waiting in queue before execution (Seconds)
+QueueLatency - Time job spent waiting in queue before execution (Seconds)
 ```
 
 This metric includes JobClass and QueueName dimensions.

@@ -60,7 +60,7 @@ class ActiveJobTest < Minitest::Test
       job.perform_now
     end
 
-    assert_equal "JobQueueTime", reported_metric
+    assert_equal "QueueLatency", reported_metric
     assert_operator reported_value, :>=, 2.5
     assert_equal "ActiveJob", reported_namespace
     assert_equal 2, reported_dimensions.size

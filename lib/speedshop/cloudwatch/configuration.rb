@@ -18,7 +18,7 @@ module Speedshop
             :Workers, :Processes, :DefaultQueueLatency, :Capacity, :Utilization, :QueueLatency, :QueueSize
           ],
           rack: [:RequestQueueTime],
-          active_job: [:JobQueueTime]
+          active_job: [:QueueLatency]
         }
         @namespaces = {puma: "Puma", sidekiq: "Sidekiq", rack: "Rack", active_job: "ActiveJob"}
         @sidekiq_queues = nil
