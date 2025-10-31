@@ -16,9 +16,23 @@ module Speedshop
 
         def setup_lifecycle_hooks
           ::Sidekiq.configure_server do |config|
-            config.on(defined?(::Sidekiq::Enterprise) ? :leader : :startup) { @reporter.start! }
-            config.on(:quiet) { @reporter.stop! }
-            config.on(:shutdown) { @reporter.stop! }
+            event = defined?(::Sidekiq::Enterprise) ? :leader : :startup
+
+            config.on(event) do
+              # Enable reporting only for leader (Enterprise) or on startup (OSS)
+              Speedshop::Cloudwatch.config.enabled[:sidekiq] = true
+            end
+
+            config.on(:quiet) do
+              # Disable reporting when shutting down
+              Speedshop::Cloudwatch.config.enabled[:sidekiq] = false
+              @reporter.stop!
+            end
+
+            config.on(:shutdown) do
+              Speedshop::Cloudwatch.config.enabled[:sidekiq] = false
+              @reporter.stop!
+            end
           end
         end
 

@@ -28,6 +28,7 @@ class ActiveJobTest < Minitest::Test
       config.client = @client
       config.interval = 60
       config.logger = Logger.new(nil)
+      config.namespaces[:active_job] = "ActiveJob"
     end
     ActiveJob::Base.queue_adapter.enqueued_jobs.clear
     ActiveJob::Base.queue_adapter.performed_jobs.clear

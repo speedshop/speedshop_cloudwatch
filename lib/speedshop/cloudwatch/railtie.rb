@@ -7,11 +7,13 @@ module Speedshop
         app.config.middleware.insert_before 0, Speedshop::Cloudwatch::RackMiddleware
       end
 
-      initializer "speedshop.cloudwatch.start_reporter" do
+      initializer "speedshop.cloudwatch.disable_in_console_and_tasks" do
         config.after_initialize do
-          next if caller.any? { |c| c.include?("console_command.rb") || c.include?("runner_command.rb") }
-          next if in_rake_task?
-          Speedshop::Cloudwatch.reporter.start!
+          if caller.any? { |c| c.include?("console_command.rb") || c.include?("runner_command.rb") } || in_rake_task?
+            Speedshop::Cloudwatch.config.enabled.keys.each do |integration|
+              Speedshop::Cloudwatch.config.enabled[integration] = false
+            end
+          end
         end
       end
 
