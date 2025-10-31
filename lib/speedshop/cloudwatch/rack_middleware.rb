@@ -8,6 +8,8 @@ module Speedshop
       end
 
       def call(env)
+        Speedshop::Cloudwatch.reporter.start!
+
         begin
           if (header = env["HTTP_X_REQUEST_START"] || env["HTTP_X_QUEUE_START"])
             queue_time = (Time.now.to_f * 1000) - header.gsub("t=", "").to_f

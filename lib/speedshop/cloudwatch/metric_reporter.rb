@@ -16,8 +16,10 @@ module Speedshop
       end
 
       def start!
+        return if started?
+
         @mutex.synchronize do
-          return if @running && @pid == Process.pid
+          return if started?
           return log_info("No integrations enabled, not starting reporter") unless @config.enabled.values.any?
           log_info("Starting metric reporter (interval: #{@config.interval}s)")
           @pid = Process.pid
@@ -27,6 +29,10 @@ module Speedshop
             run_loop
           end
         end
+      end
+
+      def started?
+        @running && @pid == Process.pid && @thread&.alive?
       end
 
       def stop!

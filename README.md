@@ -80,12 +80,12 @@ end
 Add to your `config/puma.rb`:
 
 ```ruby
-before_fork do
-  Speedshop::Cloudwatch::Puma.start!
-end
+Speedshop::Cloudwatch::Puma.register
 ```
 
-This then reports the following metrics:
+The reporter automatically starts in each worker process on the first request. This works correctly with both `preload_app true` and `false`, as well as single and cluster modes.
+
+This reports the following metrics:
 
 ```
 Workers - Number of workers configured (Count)

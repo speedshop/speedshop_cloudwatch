@@ -100,4 +100,46 @@ class MetricReporterTest < Minitest::Test
     assert_nil @reporter.thread
     refute @reporter.running
   end
+
+  def test_started_returns_false_when_not_started
+    refute @reporter.started?
+  end
+
+  def test_started_returns_true_when_started
+    @reporter.start!
+    assert @reporter.started?
+  end
+
+  def test_started_returns_false_after_stop
+    @reporter.start!
+    @reporter.stop!
+    refute @reporter.started?
+  end
+
+  def test_start_is_idempotent
+    @reporter.start!
+    thread1 = @reporter.thread
+
+    @reporter.start!
+    thread2 = @reporter.thread
+
+    assert_same thread1, thread2
+  end
+
+  def test_started_detects_pid_change
+    @reporter.start!
+    original_pid = @reporter.instance_variable_get(:@pid)
+
+    @reporter.instance_variable_set(:@pid, original_pid + 1)
+
+    refute @reporter.started?
+  end
+
+  def test_started_detects_dead_thread
+    @reporter.start!
+    @reporter.instance_variable_get(:@thread).kill
+    @reporter.instance_variable_get(:@thread).join
+
+    refute @reporter.started?
+  end
 end
