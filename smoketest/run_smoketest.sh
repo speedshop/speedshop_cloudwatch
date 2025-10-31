@@ -20,13 +20,13 @@ echo "✓ Redis started"
 echo ""
 
 echo "Step 2: Installing dependencies..."
-mise exec -- bundle install --quiet
+bundle install --quiet
 echo "✓ Dependencies installed"
 echo ""
 
 echo "Step 3: Starting Rails server (Puma)..."
 mkdir -p log tmp/pids
-mise exec -- bundle exec puma -C config/puma.rb -e development > log/puma.log 2>&1 &
+bundle exec puma -C config/puma.rb -e development > log/puma.log 2>&1 &
 PUMA_PID=$!
 echo $PUMA_PID > tmp/pids/server.pid
 sleep 3
@@ -40,7 +40,7 @@ echo "✓ Rails server started with 2 workers"
 echo ""
 
 echo "Step 4: Starting Sidekiq..."
-mise exec -- bundle exec sidekiq > log/sidekiq.log 2>&1 &
+bundle exec sidekiq > log/sidekiq.log 2>&1 &
 SIDEKIQ_PID=$!
 echo $SIDEKIQ_PID > tmp/pids/sidekiq.pid
 sleep 2
@@ -76,7 +76,7 @@ sleep 2
 echo ""
 
 echo "Step 8: Verifying captured metrics..."
-mise exec -- bundle exec ruby verify_metrics.rb
+bundle exec ruby verify_metrics.rb
 
 if [ $? -eq 0 ]; then
     echo ""
