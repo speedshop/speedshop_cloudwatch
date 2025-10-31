@@ -8,3 +8,6 @@
 /tmp/
 prd.md
 dump.rdb
+*.log
+smoketest/tmp/
+smoketest/log/
