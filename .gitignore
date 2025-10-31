@@ -11,3 +11,4 @@ dump.rdb
 *.log
 smoketest/tmp/
 smoketest/log/
+TODO.md

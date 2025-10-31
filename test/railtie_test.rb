@@ -1,13 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
-
-begin
-  require "rails"
-rescue LoadError
-  return
-end
-
+require "rails"
 require "speedshop/cloudwatch/railtie"
 
 class RailtieTest < Minitest::Test
@@ -95,6 +89,23 @@ class RailtieTest < Minitest::Test
     Object.stub_const(:Rake, rake_double) do
       refute @railtie.send(:in_rake_task?)
     end
+  end
+
+  def test_middleware_is_inserted
+    app = Minitest::Mock.new
+    config = Minitest::Mock.new
+    middleware = Minitest::Mock.new
+
+    config.expect(:middleware, middleware)
+    app.expect(:config, config)
+    middleware.expect(:insert_before, nil, [0, Speedshop::Cloudwatch::RackMiddleware])
+
+    initializer = Speedshop::Cloudwatch::Railtie.initializers.find { |i| i.name == "speedshop.cloudwatch.insert_middleware" }
+    initializer.block.call(app)
+
+    app.verify
+    config.verify
+    middleware.verify
   end
 
   private

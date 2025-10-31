@@ -4,8 +4,7 @@ module Speedshop
   module Cloudwatch
     class Railtie < ::Rails::Railtie
       initializer "speedshop.cloudwatch.insert_middleware", before: :build_middleware_stack do |app|
-        next unless Speedshop::Cloudwatch.config.enabled[:rack]
-        app.config.middleware.use Speedshop::Cloudwatch::RackMiddleware
+        app.config.middleware.insert_before 0, Speedshop::Cloudwatch::RackMiddleware
       end
 
       initializer "speedshop.cloudwatch.start_reporter" do

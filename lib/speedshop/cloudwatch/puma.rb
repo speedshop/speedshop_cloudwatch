@@ -15,9 +15,12 @@ module Speedshop
         def collect_metrics
           return unless defined?(::Puma)
           stats = ::Puma.stats_hash
-          %i[workers booted_workers old_workers].each do |m|
-            metric_name = m.to_s.split("_").map(&:capitalize).join
-            @reporter.report(metric_name, stats[m] || 0, namespace: @namespace, unit: "Count")
+
+          if stats[:worker_status]
+            %i[workers booted_workers old_workers].each do |m|
+              metric_name = m.to_s.split("_").map(&:capitalize).join
+              @reporter.report(metric_name, stats[m] || 0, namespace: @namespace, unit: "Count")
+            end
           end
 
           workers = stats[:worker_status] ? worker_statuses(stats) : [[stats, 0]]

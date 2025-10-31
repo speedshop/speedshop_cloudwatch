@@ -6,6 +6,8 @@ Cloudwatch is unusually difficult to integrate with properly in Ruby, because th
 
 This library helps you avoid that latency by reporting to Cloudwatch in a background thread.
 
+This library supports **Ruby 2.7+, Sidekiq 7+, and Puma 6+**.
+
 ## Metrics
 
 If not configured, all metrics are enabled by default. Here are the default metric lists you can copy and customize:
@@ -30,6 +32,8 @@ config.metrics[:rack] = [:RequestQueueTime]
 config.metrics[:active_job] = [:QueueLatency]
 ```
 
+For a full explanation of every metric, [read our docs.](./docs/metrics.md)
+
 This gem is for **infrastructure and queue metrics**, not application performance metrics, like response times, job execution times, or error rates. Use your APM for that stuff.
 
 ## Installation
@@ -37,13 +41,6 @@ This gem is for **infrastructure and queue metrics**, not application performanc
 ```
 gem `speedshop_cloudwatch`
 ```
-
-### Version Support
-
-This gem is tested against the following combinations:
-
-- **Ruby 2.7, 3.0, 3.1**: Puma 6.x + Sidekiq 7.x
-- **Ruby 3.2, 3.3, 3.4**: Puma 7.x + Sidekiq 8.x
 
 ## Configuration
 
@@ -73,6 +70,34 @@ Speedshop::Cloudwatch.configure do |config|
   config.namespaces[:rack] = "MyApp/Rack"
   config.namespaces[:active_job] = "MyApp/ActiveJob"
 end
+```
+
+### Rails
+
+By default, if you're using Rails, the gem automatically:
+- Inserts the Rack middleware at the top of the middleware stack
+- Starts the reporter after initialization (but not in console, runner, or asset tasks)
+
+If you want full control over initialization, add `require: false` to your Gemfile:
+
+```ruby
+gem 'speedshop_cloudwatch', require: false
+```
+
+Then manually require the core module without the railtie:
+
+```ruby
+require 'speedshop/cloudwatch'
+
+# Insert middleware manually (if using Rack integration)
+Rails.application.config.middleware.insert_before 0, Speedshop::Cloudwatch::RackMiddleware
+
+# Register integrations
+Speedshop::Cloudwatch::Puma.register  # if using Puma
+Speedshop::Cloudwatch::Sidekiq.register  # if using Sidekiq
+
+# Start reporter manually
+Speedshop::Cloudwatch.reporter.start!
 ```
 
 ### Puma Integration

@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    name: Ruby ${{ matrix.ruby }} / Puma ${{ matrix.puma }} / Sidekiq ${{ matrix.sidekiq }}
+    name: Ruby ${{ matrix.ruby }} / Puma ${{ matrix.puma }} / Sidekiq ${{ matrix.sidekiq }} / Rails ${{ matrix.rails }}
     strategy:
       fail-fast: false
       matrix:
@@ -18,27 +18,33 @@ jobs:
           - ruby: '2.7'
             puma: '6'
             sidekiq: '7'
-            gemfile: puma_6_sidekiq_7
+            rails: '7'
+            gemfile: puma_6_sidekiq_7_rails_7
           - ruby: '3.0'
             puma: '6'
             sidekiq: '7'
-            gemfile: puma_6_sidekiq_7
+            rails: '7'
+            gemfile: puma_6_sidekiq_7_rails_7
           - ruby: '3.1'
             puma: '6'
             sidekiq: '7'
-            gemfile: puma_6_sidekiq_7
+            rails: '7'
+            gemfile: puma_6_sidekiq_7_rails_7
           - ruby: '3.2'
             puma: '7'
             sidekiq: '8'
-            gemfile: puma_7_sidekiq_8
+            rails: '8'
+            gemfile: puma_7_sidekiq_8_rails_8
           - ruby: '3.3'
             puma: '7'
             sidekiq: '8'
-            gemfile: puma_7_sidekiq_8
+            rails: '8'
+            gemfile: puma_7_sidekiq_8_rails_8
           - ruby: '3.4'
             puma: '7'
             sidekiq: '8'
-            gemfile: puma_7_sidekiq_8
+            rails: '8'
+            gemfile: puma_7_sidekiq_8_rails_8
 
     services:
       redis:
