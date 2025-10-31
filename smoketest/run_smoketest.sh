@@ -63,19 +63,24 @@ done
 echo "✓ Generated 10 health checks and 10 job enqueues"
 echo ""
 
-echo "Step 6: Waiting for metrics collection (2 minutes)..."
+echo "Step 6: Testing db rake task (should not report metrics)..."
+bundle exec rake db:test_metric_report
+echo "✓ Rake task completed"
+echo ""
+
+echo "Step 7: Waiting for metrics collection (2 minutes)..."
 sleep 120
 echo "✓ Metrics collected"
 echo ""
 
-echo "Step 7: Stopping services..."
+echo "Step 8: Stopping services..."
 kill $SIDEKIQ_PID 2>/dev/null && echo "✓ Sidekiq stopped"
 kill $PUMA_PID 2>/dev/null && echo "✓ Rails server stopped"
 redis-cli shutdown && echo "✓ Redis stopped"
 sleep 2
 echo ""
 
-echo "Step 8: Verifying captured metrics..."
+echo "Step 9: Verifying captured metrics..."
 bundle exec ruby verify_metrics.rb
 
 if [ $? -eq 0 ]; then

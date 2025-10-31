@@ -38,8 +38,22 @@ This gem is for **infrastructure and queue metrics**, not application performanc
 
 ## Installation
 
-```
+```ruby
 gem `speedshop_cloudwatch`
+```
+
+```ruby
+# config/initializers/speedshop-cloudwatch.rb
+Speedshop::Cloudwatch::Puma.register
+Speedshop::Cloudwatch::Sidekiq.register
+```
+
+```ruby
+# app/jobs/application_job.rb
+
+class ApplicationJob
+  include Speedshop::Cloudwatch::ActiveJob
+end
 ```
 
 ## Configuration
@@ -54,7 +68,7 @@ Speedshop::Cloudwatch.configure do |config|
   # Optional: Custom logger (defaults to Rails.logger if available, otherwise STDOUT)
   config.logger = Logger.new(Rails.root.join("log", "cloudwatch.log"))
 
-  # Disable an entire integration
+  # Disable an entire integration.
   config.enabled[:rack] = false
 
   # Customize which metrics to report (whitelist)
@@ -70,33 +84,6 @@ Speedshop::Cloudwatch.configure do |config|
   config.namespaces[:rack] = "MyApp/Rack"
   config.namespaces[:active_job] = "MyApp/ActiveJob"
 end
-```
-
-### Rails
-
-By default, if you're using Rails, the gem automatically inserts the Rack middleware at the top of the middleware stack.
-
-The reporter starts automatically when the first metric is reported - no manual setup required.
-
-If you want full control over initialization, add `require: false` to your Gemfile:
-
-```ruby
-gem 'speedshop_cloudwatch', require: false
-```
-
-Then manually require the core module without the railtie:
-
-```ruby
-require 'speedshop/cloudwatch'
-
-# Insert middleware manually (if using Rack integration)
-Rails.application.config.middleware.insert_before 0, Speedshop::Cloudwatch::RackMiddleware
-
-# Register integrations
-Speedshop::Cloudwatch::Puma.register  # if using Puma
-Speedshop::Cloudwatch::Sidekiq.register  # if using Sidekiq
-
-# Reporter starts automatically when first metric is reported
 ```
 
 ### Puma Integration
@@ -185,3 +172,28 @@ QueueLatency - Time job spent waiting in queue before execution (Seconds)
 ```
 
 This metric includes JobClass and QueueName dimensions.
+
+### Rails
+
+We do two things when we're running in a Rails app:
+
+1. Automatically insert a Rack middleware at index 0.
+2. Disable metric collection if running in Rake or a console.
+
+If you want full control over these behaviors, add `require: false` to your Gemfile:
+
+```ruby
+gem 'speedshop_cloudwatch', require: false
+```
+
+Then manually require the core module without the railtie:
+
+```ruby
+# config/initializers/speedshop-cloudwatch.rb
+require 'speedshop/cloudwatch'
+
+# Insert middleware manually (if using Rack integration)
+Rails.application.config.middleware.insert_before 0, Speedshop::Cloudwatch::RackMiddleware
+
+# At this point, the auto-disable behavior in Rake is disabled. You'll have to re-implement yourself.
+```

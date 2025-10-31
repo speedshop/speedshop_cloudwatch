@@ -15,7 +15,7 @@ end
 
 desc "Run flog"
 task :flog do
-  flog_output = `bundle exec flog -a lib`
+  flog_output = `bundle exec flog -a lib test`
   puts flog_output
   method_scores = flog_output.lines.grep(/^\s+[0-9]+\.[0-9]+:.*#/).map { |line| line.split.first.to_f }
   max_score = method_scores.max
@@ -27,7 +27,7 @@ end
 
 desc "Run flay"
 task :flay do
-  flay_output = `bundle exec flay lib`
+  flay_output = `bundle exec flay lib test`
   puts flay_output
   flay_score = flay_output[/Total score.*?=\s*(\d+)/, 1]&.to_i
   if flay_score && flay_score > FLAY_THRESHOLD

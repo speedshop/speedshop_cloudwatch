@@ -16,9 +16,7 @@ WebMock.stub_request(:post, /monitoring\..*\.amazonaws\.com/)
       headers: request.headers
     }
 
-    File.open(Rails.root.join("tmp", "captured_metrics.json"), "w") do |f|
-      f.write(JSON.pretty_generate($captured_metrics))
-    end
+    File.write(Rails.root.join("tmp", "captured_metrics.json"), JSON.pretty_generate($captured_metrics))
 
     {status: 200, body: '<?xml version="1.0"?><PutMetricDataResponse xmlns="http://monitoring.amazonaws.com/doc/2010-08-01/"><ResponseMetadata><RequestId>test-request-id</RequestId></ResponseMetadata></PutMetricDataResponse>'}
   end

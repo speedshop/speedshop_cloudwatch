@@ -66,31 +66,8 @@ class SidekiqTest < Minitest::Test
   end
 
   def test_filters_queues_when_configured
-    queues = [
-      TestDoubles::QueueDouble.new("critical", 1, 1.5),
-      TestDoubles::QueueDouble.new("default", 2, 0.5),
-      TestDoubles::QueueDouble.new("low_priority", 3, 2.0)
-    ]
-
-    Speedshop::Cloudwatch.configure do |config|
-      config.client = Minitest::Mock.new
-      config.interval = 60
-      config.logger = Logger.new(nil)
-      config.sidekiq_queues = ["critical", "default"]
-    end
-
-    test_reporter = TestDoubles::ReporterDouble.new
-
-    ::Sidekiq::Queue.stub(:all, queues) do
-      ::Sidekiq.stub(:configure_server, proc { |&block| block.call(@sidekiq_config_mock) }) do
-        Speedshop::Cloudwatch::Sidekiq.register(reporter: test_reporter)
-        collector = test_reporter.collectors.last
-        collector.call
-      end
-    end
-
-    queue_metrics = test_reporter.metrics_collected.select { |m| m[:dimensions]&.any? { |d| d[:name] == "QueueName" } }
-    queue_names = queue_metrics.map { |m| m[:dimensions].find { |d| d[:name] == "QueueName" }[:value] }.uniq
+    configure_sidekiq(sidekiq_queues: ["critical", "default"])
+    queue_names = collect_sidekiq_queue_names
 
     assert_includes queue_names, "critical"
     assert_includes queue_names, "default"
@@ -98,35 +75,44 @@ class SidekiqTest < Minitest::Test
   end
 
   def test_monitors_all_queues_by_default
-    queues = [
-      TestDoubles::QueueDouble.new("critical", 1, 1.5),
-      TestDoubles::QueueDouble.new("default", 2, 0.5),
-      TestDoubles::QueueDouble.new("low_priority", 3, 2.0)
-    ]
-
-    Speedshop::Cloudwatch.configure do |config|
-      config.client = Minitest::Mock.new
-      config.interval = 60
-      config.logger = Logger.new(nil)
-      config.sidekiq_queues = nil
-    end
-
-    test_reporter = TestDoubles::ReporterDouble.new
-
-    ::Sidekiq::Queue.stub(:all, queues) do
-      ::Sidekiq.stub(:configure_server, proc { |&block| block.call(@sidekiq_config_mock) }) do
-        Speedshop::Cloudwatch::Sidekiq.register(reporter: test_reporter)
-        collector = test_reporter.collectors.last
-        collector.call
-      end
-    end
-
-    queue_metrics = test_reporter.metrics_collected.select { |m| m[:dimensions]&.any? { |d| d[:name] == "QueueName" } }
-    queue_names = queue_metrics.map { |m| m[:dimensions].find { |d| d[:name] == "QueueName" }[:value] }.uniq
+    configure_sidekiq(sidekiq_queues: nil)
+    queue_names = collect_sidekiq_queue_names
 
     assert_includes queue_names, "critical"
     assert_includes queue_names, "default"
     assert_includes queue_names, "low_priority"
+  end
+
+  private
+
+  def sample_queues
+    [
+      TestDoubles::QueueDouble.new("critical", 1, 1.5),
+      TestDoubles::QueueDouble.new("default", 2, 0.5),
+      TestDoubles::QueueDouble.new("low_priority", 3, 2.0)
+    ]
+  end
+
+  def configure_sidekiq(sidekiq_queues:)
+    Speedshop::Cloudwatch.configure do |config|
+      config.client = Minitest::Mock.new
+      config.interval = 60
+      config.logger = Logger.new(nil)
+      config.sidekiq_queues = sidekiq_queues
+    end
+  end
+
+  def collect_sidekiq_queue_names
+    test_reporter = TestDoubles::ReporterDouble.new
+    ::Sidekiq::Queue.stub(:all, sample_queues) do
+      ::Sidekiq.stub(:configure_server, proc { |&block| block.call(@sidekiq_config_mock) }) do
+        Speedshop::Cloudwatch::Sidekiq.register(reporter: test_reporter)
+        test_reporter.collectors.last.call
+      end
+    end
+
+    queue_metrics = test_reporter.metrics_collected.select { |m| m[:dimensions]&.any? { |d| d[:name] == "QueueName" } }
+    queue_metrics.map { |m| m[:dimensions].find { |d| d[:name] == "QueueName" }[:value] }.uniq
   end
 
   def test_lifecycle_hooks_registered_for_enterprise

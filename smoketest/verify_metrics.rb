@@ -8,6 +8,10 @@ EXPECTED_METRICS = {
   "ActiveJob" => ["QueueLatency"]
 }
 
+FORBIDDEN_METRICS = {
+  "Test" => ["RakeTaskMetric"]
+}
+
 metrics_file = File.join(__dir__, "tmp", "captured_metrics.json")
 
 unless File.exist?(metrics_file)
@@ -62,6 +66,24 @@ EXPECTED_METRICS.each do |integration, expected|
   puts ""
 end
 
+puts "Checking for forbidden metrics (should NOT be present):"
+puts ""
+
+forbidden_found = []
+FORBIDDEN_METRICS.each do |integration, forbidden|
+  captured = captured_metrics[integration] || []
+  forbidden.each do |metric|
+    if captured.include?(metric)
+      puts "  ❌ #{integration}/#{metric} (SHOULD NOT BE PRESENT)"
+      forbidden_found << "#{integration}/#{metric}"
+      all_passed = false
+    else
+      puts "  ✓ #{integration}/#{metric} correctly not captured"
+    end
+  end
+end
+puts ""
+
 puts "Summary:"
 puts "  Total API calls: #{captured_data.length}"
 puts "  Total unique metrics: #{captured_metrics.values.flatten.uniq.length}"
@@ -71,9 +93,16 @@ puts ""
 
 if all_passed
   puts "✅ All expected metrics were captured!"
+  puts "✅ No forbidden metrics were captured!"
   exit 0
 else
-  puts "❌ Missing #{missing_metrics.length} metrics:"
-  missing_metrics.each { |m| puts "   - #{m}" }
+  if missing_metrics.any?
+    puts "❌ Missing #{missing_metrics.length} metrics:"
+    missing_metrics.each { |m| puts "   - #{m}" }
+  end
+  if forbidden_found.any?
+    puts "❌ Found #{forbidden_found.length} forbidden metrics:"
+    forbidden_found.each { |m| puts "   - #{m}" }
+  end
   exit 1
 end

@@ -38,59 +38,61 @@ class PumaTest < Minitest::Test
   end
 
   def test_collects_metrics_with_clustered_mode_stats
-    reporter = TestDoubles::ReporterDouble.new
+    reporter = collect_clustered_puma_metrics
 
-    stub_puma_stats = {
+    assert_collects_cluster_level_metrics(reporter)
+    assert_collects_worker_level_metrics(reporter)
+    assert_collects_metrics_for_all_workers(reporter)
+  end
+
+  private
+
+  def collect_clustered_puma_metrics
+    reporter = TestDoubles::ReporterDouble.new
+    stub_puma_stats = clustered_puma_stats
+    ::Puma.stub(:stats_hash, stub_puma_stats) do
+      Speedshop::Cloudwatch::Puma.register(namespace: "Puma", reporter: reporter)
+      reporter.collectors.last.call
+    end
+    reporter
+  end
+
+  def clustered_puma_stats
+    {
       workers: 2,
       booted_workers: 2,
       old_workers: 0,
       worker_status: [
-        {
-          last_status: {
-            running: 5,
-            backlog: 0,
-            pool_capacity: 5,
-            max_threads: 5
-          }
-        },
-        {
-          last_status: {
-            running: 4,
-            backlog: 1,
-            pool_capacity: 5,
-            max_threads: 5
-          }
-        }
+        {last_status: {running: 5, backlog: 0, pool_capacity: 5, max_threads: 5}},
+        {last_status: {running: 4, backlog: 1, pool_capacity: 5, max_threads: 5}}
       ]
     }
+  end
 
-    ::Puma.stub(:stats_hash, stub_puma_stats) do
-      Speedshop::Cloudwatch::Puma.register(namespace: "Puma", reporter: reporter)
-      collector = reporter.collectors.last
-      collector.call
-    end
-
+  def assert_collects_cluster_level_metrics(reporter)
     metric_names = reporter.metrics_collected.map { |m| m[:name] }
     assert_includes metric_names, "Workers"
     assert_includes metric_names, "BootedWorkers"
     assert_includes metric_names, "OldWorkers"
-    assert_includes metric_names, "Running"
-    assert_includes metric_names, "Backlog"
-    assert_includes metric_names, "PoolCapacity"
-    assert_includes metric_names, "MaxThreads"
+  end
+
+  def assert_collects_worker_level_metrics(reporter)
+    metric_names = reporter.metrics_collected.map { |m| m[:name] }
+    ["Running", "Backlog", "PoolCapacity", "MaxThreads"].each do |metric|
+      assert_includes metric_names, metric
+    end
 
     running_metrics = reporter.metrics_collected.select { |m| m[:name] == "Running" }
     assert_equal 2, running_metrics.size
+  end
 
-    worker_0_metrics = reporter.metrics_collected.select do |m|
-      m[:dimensions]&.any? { |d| d[:name] == "WorkerIndex" && d[:value] == "0" }
+  def assert_collects_metrics_for_all_workers(reporter)
+    [0, 1].each do |worker_index|
+      worker_metrics = reporter.metrics_collected.select do |m|
+        m[:dimensions]&.any? { |d| d[:name] == "WorkerIndex" && d[:value] == worker_index.to_s }
+      end
+      assert_operator worker_metrics.size, :>, 0
     end
-    assert_operator worker_0_metrics.size, :>, 0
-
-    worker_1_metrics = reporter.metrics_collected.select do |m|
-      m[:dimensions]&.any? { |d| d[:name] == "WorkerIndex" && d[:value] == "1" }
-    end
-    assert_operator worker_1_metrics.size, :>, 0
   end
 
   def test_uses_configured_namespace
