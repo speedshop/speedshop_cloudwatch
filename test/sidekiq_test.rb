@@ -9,9 +9,11 @@ class SidekiqTest < Minitest::Test
   def setup
     Sidekiq.configure_client do |config|
       config.redis = {url: "redis://localhost:6379/15"}
+      config.logger = Logger.new(nil)
     end
     Sidekiq.configure_server do |config|
       config.redis = {url: "redis://localhost:6379/15"}
+      config.logger = Logger.new(nil)
     end
     Sidekiq.redis(&:flushdb)
 
