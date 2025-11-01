@@ -53,17 +53,14 @@ module Speedshop
         thread_to_join&.join
       end
 
-      def report(**kwargs)
-        dimensions = kwargs.delete(:dimensions) || {}
-        unit = kwargs.delete(:unit) || "None"
-
-        raise ArgumentError, "Expected exactly one metric" unless kwargs.size == 1
-        metric_name, value = kwargs.first
+      def report(metric:, value:, dimensions: {}, namespace: nil)
+        metric_name = metric.to_sym
 
         integration = find_integration_for_metric(metric_name)
         return unless integration
 
-        namespace = @config.namespaces[integration]
+        ns = namespace || @config.namespaces[integration]
+        unit = @config.units[metric_name] || "None"
 
         if [:rack, :active_job].include?(integration)
           @mutex.synchronize { @registered_integrations << integration }
@@ -75,7 +72,7 @@ module Speedshop
         all_dimensions = dimensions_array + custom_dimensions
 
         @mutex.synchronize do
-          @queue << {metric_name: metric_name.to_s, value: value, namespace: namespace, unit: unit,
+          @queue << {metric_name: metric_name.to_s, value: value, namespace: ns, unit: unit,
                      dimensions: all_dimensions, timestamp: Time.now}
         end
 

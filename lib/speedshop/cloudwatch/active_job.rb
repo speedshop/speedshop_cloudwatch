@@ -11,7 +11,7 @@ module Speedshop
         begin
           if enqueued_at
             queue_time = Time.now.to_f - enqueued_at.to_f
-            Cloudwatch.reporter.report(QueueLatency: queue_time, unit: "Seconds", dimensions: {JobClass: self.class.name, QueueName: queue_name})
+            Cloudwatch.reporter.report(metric: :QueueLatency, value: queue_time, dimensions: {JobClass: self.class.name, QueueName: queue_name})
           end
         rescue => e
           Speedshop::Cloudwatch.log_error("Failed to collect ActiveJob metrics: #{e.message}", e)

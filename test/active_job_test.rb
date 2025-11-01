@@ -50,9 +50,8 @@ class ActiveJobTest < SpeedshopCloudwatchTest
       job.perform_now
     end
 
-    assert_equal :QueueLatency, reported_kwargs.keys.first
-    assert_operator reported_kwargs[:QueueLatency], :>=, 2.5
-    assert_equal "Seconds", reported_kwargs[:unit]
+    assert_equal :QueueLatency, reported_kwargs[:metric]
+    assert_operator reported_kwargs[:value], :>=, 2.5
     assert_equal 2, reported_kwargs[:dimensions].size
     assert_equal "TestJob", reported_kwargs[:dimensions][:JobClass]
     assert_equal "default", reported_kwargs[:dimensions][:QueueName]
@@ -98,7 +97,7 @@ class ActiveJobTest < SpeedshopCloudwatchTest
       job.perform_now
     end
 
-    assert_equal :QueueLatency, reported_kwargs.keys.first
+    assert_equal :QueueLatency, reported_kwargs[:metric]
   end
 
   def test_respects_active_job_metrics_whitelist

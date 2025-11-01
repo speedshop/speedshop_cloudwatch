@@ -19,7 +19,7 @@ module Speedshop
             %i[workers booted_workers old_workers].each do |m|
               # Submit to SnakeCase tyranny
               metric_name = m.to_s.split("_").map(&:capitalize).join.to_sym
-              @reporter.report(metric_name => stats[m] || 0, :unit => "Count")
+              @reporter.report(metric: metric_name, value: stats[m] || 0)
             end
           end
 
@@ -36,7 +36,7 @@ module Speedshop
         def report_worker(stats, idx)
           %i[running backlog pool_capacity max_threads].each do |m|
             metric_name = m.to_s.split("_").map(&:capitalize).join.to_sym
-            @reporter.report(metric_name => stats[m] || 0, :unit => "Count", :dimensions => {WorkerIndex: idx.to_s})
+            @reporter.report(metric: metric_name, value: stats[m] || 0, dimensions: {WorkerIndex: idx.to_s})
           end
         end
       end

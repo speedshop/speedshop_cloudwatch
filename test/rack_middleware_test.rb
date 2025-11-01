@@ -76,7 +76,7 @@ class RackMiddlewareTest < SpeedshopCloudwatchTest
       call_middleware_with_header("HTTP_X_REQUEST_START")
     end
 
-    assert_equal :RequestQueueTime, reported_kwargs.keys.first
+    assert_equal :RequestQueueTime, reported_kwargs[:metric]
   end
 
   def test_logs_error_when_collection_fails

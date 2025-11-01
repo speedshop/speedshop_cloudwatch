@@ -9,12 +9,7 @@ module TestDoubles
       @metrics_collected = []
     end
 
-    def report(**kwargs)
-      dimensions = kwargs.delete(:dimensions) || {}
-      unit = kwargs.delete(:unit) || "None"
-      namespace = kwargs.delete(:namespace)
-      metric_name, value = kwargs.first
-
+    def report(metric:, value:, dimensions: {}, namespace: nil)
       dims = if dimensions.is_a?(Hash)
         dimensions.map { |k, v| {name: k.to_s, value: v.to_s} }
       elsif dimensions.is_a?(Array)
@@ -23,7 +18,7 @@ module TestDoubles
         []
       end
 
-      @metrics_collected << {name: metric_name.to_s, value: value, unit: unit, dimensions: dims, namespace: namespace}
+      @metrics_collected << {name: metric.to_s, value: value, dimensions: dims, namespace: namespace}
     end
 
     def register_collector(integration, &block)

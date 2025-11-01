@@ -47,23 +47,23 @@ module Speedshop
             EnqueuedJobs: stats.enqueued, ProcessedJobs: stats.processed, FailedJobs: stats.failed,
             ScheduledJobs: stats.scheduled_size, RetryJobs: stats.retry_size, DeadJobs: stats.dead_size,
             Workers: stats.workers_size, Processes: stats.processes_size
-          }.each { |m, v| @reporter.report(m => v, :unit => "Count") }
-          @reporter.report(DefaultQueueLatency: stats.default_queue_latency, unit: "Seconds")
+          }.each { |m, v| @reporter.report(metric: m, value: v) }
+          @reporter.report(metric: :DefaultQueueLatency, value: stats.default_queue_latency)
         end
 
         def report_utilization(processes)
           capacity = processes.sum { |p| p["concurrency"] }
-          @reporter.report(Capacity: capacity, unit: "Count")
+          @reporter.report(metric: :Capacity, value: capacity)
 
           utilization = avg_utilization(processes) * 100.0
-          @reporter.report(Utilization: utilization, unit: "Percent") unless utilization.nan?
+          @reporter.report(metric: :Utilization, value: utilization) unless utilization.nan?
 
           processes.group_by { |p| p["tag"] }.each do |tag, procs|
             next unless tag
             capacity = procs.sum { |p| p["concurrency"] }
-            @reporter.report(Capacity: capacity, unit: "Count", dimensions: {Tag: tag})
+            @reporter.report(metric: :Capacity, value: capacity, dimensions: {Tag: tag})
             util = avg_utilization(procs) * 100.0
-            @reporter.report(Utilization: util, unit: "Percent", dimensions: {Tag: tag}) unless util.nan?
+            @reporter.report(metric: :Utilization, value: util, dimensions: {Tag: tag}) unless util.nan?
           end
         end
 
@@ -73,7 +73,7 @@ module Speedshop
             util = p["busy"] / p["concurrency"].to_f * 100.0
             dims = {Hostname: p["hostname"]}
             dims[:Tag] = p["tag"] if p["tag"] && !p["tag"].to_s.empty?
-            @reporter.report(Utilization: util, unit: "Percent", dimensions: dims)
+            @reporter.report(metric: :Utilization, value: util, dimensions: dims)
           end
         end
 
@@ -85,8 +85,8 @@ module Speedshop
           all_queues = ::Sidekiq::Queue.all
           queues = (configured.nil? || configured.empty?) ? all_queues : all_queues.select { |q| configured.include?(q.name) }
           queues.each do |q|
-            @reporter.report(QueueLatency: q.latency, unit: "Seconds", dimensions: {QueueName: q.name})
-            @reporter.report(QueueSize: q.size, unit: "Count", dimensions: {QueueName: q.name})
+            @reporter.report(metric: :QueueLatency, value: q.latency, dimensions: {QueueName: q.name})
+            @reporter.report(metric: :QueueSize, value: q.size, dimensions: {QueueName: q.name})
           end
         end
 
