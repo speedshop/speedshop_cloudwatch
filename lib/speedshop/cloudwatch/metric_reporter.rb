@@ -68,7 +68,7 @@ module Speedshop
 
         return unless metric_allowed?(integration, metric_name)
 
-        dimensions_array = convert_dimensions(dimensions)
+        dimensions_array = dimensions.map { |k, v| {name: k.to_s, value: v.to_s} }
         all_dimensions = dimensions_array + custom_dimensions
 
         @mutex.synchronize do
@@ -143,17 +143,6 @@ module Speedshop
 
       def find_integration_for_metric(metric_name)
         @config.metrics.find { |int, metrics| metrics.include?(metric_name.to_sym) }&.first
-      end
-
-      def convert_dimensions(dimensions)
-        case dimensions
-        when Hash
-          dimensions.map { |k, v| {name: k.to_s, value: v.to_s} }
-        when Array
-          dimensions
-        else
-          []
-        end
       end
     end
   end

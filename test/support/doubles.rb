@@ -10,14 +10,7 @@ module TestDoubles
     end
 
     def report(metric:, value:, dimensions: {}, namespace: nil)
-      dims = if dimensions.is_a?(Hash)
-        dimensions.map { |k, v| {name: k.to_s, value: v.to_s} }
-      elsif dimensions.is_a?(Array)
-        dimensions
-      else
-        []
-      end
-
+      dims = dimensions.map { |k, v| {name: k.to_s, value: v.to_s} }
       @metrics_collected << {name: metric.to_s, value: value, dimensions: dims, namespace: namespace}
     end
 
