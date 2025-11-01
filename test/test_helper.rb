@@ -3,31 +3,45 @@
 $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 require "speedshop/cloudwatch"
 require "minitest/autorun"
+require "webmock/minitest"
 require_relative "support/doubles"
 
 class SpeedshopCloudwatchTest < Minitest::Test
   def setup
-    @client = Minitest::Mock.new
-    Speedshop::Cloudwatch.instance_variable_set(:@config, nil)
+    reset_singletons
+    WebMock.disable_net_connect!
+    stub_request(:post, /monitoring\..*\.amazonaws\.com/).to_return(status: 200, body: "{}")
     Speedshop::Cloudwatch.configure do |config|
-      config.client = @client
-      config.interval = 60
+      config.client = Aws::CloudWatch::Client.new(region: "us-east-1", stub_responses: true)
+      config.interval = 0.1
       config.logger = Logger.new(nil)
     end
-    clear_reporter_state
   end
 
   def teardown
-    clear_reporter_state
-    Speedshop::Cloudwatch.remove_instance_variable(:@config) if Speedshop::Cloudwatch.instance_variable_defined?(:@config)
-    Speedshop::Cloudwatch.remove_instance_variable(:@reporter) if Speedshop::Cloudwatch.instance_variable_defined?(:@reporter)
+    reset_singletons
+    WebMock.reset!
   end
 
   private
 
-  def clear_reporter_state
-    return unless Speedshop::Cloudwatch.instance_variable_defined?(:@reporter)
-    reporter = Speedshop::Cloudwatch.instance_variable_get(:@reporter)
-    reporter&.clear_all
+  def reset_singletons
+    reset_reporter
+    reset_config
+    reset_integrations
+  end
+
+  def reset_reporter
+    Speedshop::Cloudwatch::Reporter.reset
+  end
+
+  def reset_config
+    Speedshop::Cloudwatch::Config.reset
+  end
+
+  def reset_integrations
+    Speedshop::Cloudwatch::Integration.clear_integrations
+    Speedshop::Cloudwatch::Integration.add_integration(:puma, Speedshop::Cloudwatch::Puma::MetricsCollector)
+    Speedshop::Cloudwatch::Integration.add_integration(:sidekiq, Speedshop::Cloudwatch::Sidekiq::MetricsCollector)
   end
 end

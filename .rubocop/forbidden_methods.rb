@@ -14,8 +14,15 @@ module RuboCop
 
         def on_send(node)
           return unless FORBIDDEN_METHODS.include?(node.method_name)
+          return unless in_test_file?
 
           add_offense(node, message: format(MSG, method: node.method_name))
+        end
+
+        private
+
+        def in_test_file?
+          processed_source.file_path.include?("/test/")
         end
       end
     end

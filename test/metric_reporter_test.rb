@@ -8,7 +8,7 @@ class MetricReporterTest < SpeedshopCloudwatchTest
     @config = Speedshop::Cloudwatch.config
     @config.namespaces[:test] = "TestApp"
     @config.metrics[:test] = [:test_metric, :another_metric, :custom_metric, :metric1, :metric2]
-    @reporter = Speedshop::Cloudwatch::MetricReporter.new(config: @config)
+    @reporter = Speedshop::Cloudwatch::Reporter.instance
   end
 
   def teardown
@@ -34,7 +34,7 @@ class MetricReporterTest < SpeedshopCloudwatchTest
   end
 
   def test_respects_puma_metrics_whitelist
-    @reporter.register_collector(:puma) {}
+    @reporter.enable_integration(:puma)
     @config.metrics[:puma] = [:Workers]
     @reporter.report(metric: :Workers, value: 4)
     @reporter.report(metric: :BootedWorkers, value: 4)
@@ -52,7 +52,7 @@ class MetricReporterTest < SpeedshopCloudwatchTest
   end
 
   def test_respects_sidekiq_metrics_whitelist
-    @reporter.register_collector(:sidekiq) {}
+    @reporter.enable_integration(:sidekiq)
     @config.metrics[:sidekiq] = [:EnqueuedJobs, :QueueLatency]
     @reporter.report(metric: :EnqueuedJobs, value: 10)
     @reporter.report(metric: :ProcessedJobs, value: 100)
@@ -69,7 +69,7 @@ class MetricReporterTest < SpeedshopCloudwatchTest
   def test_allows_unknown_namespaces
     @config.namespaces[:custom] = "CustomNamespace"
     @config.metrics[:custom] = [:my_custom_metric]
-    @reporter.register_collector(:custom) {}
+    @reporter.enable_integration(:custom)
     @reporter.report(metric: :my_custom_metric, value: 42)
 
     queue = @reporter.queue
@@ -77,6 +77,7 @@ class MetricReporterTest < SpeedshopCloudwatchTest
   end
 
   def test_does_not_start_when_no_collectors_registered
+    Speedshop::Cloudwatch::Integration.clear_integrations
     @reporter.start!
 
     assert_nil @reporter.thread
@@ -88,20 +89,20 @@ class MetricReporterTest < SpeedshopCloudwatchTest
   end
 
   def test_started_returns_true_when_started
-    @reporter.register_collector(:test) {}
+    @reporter.enable_integration(:test)
     @reporter.start!
     assert @reporter.started?
   end
 
   def test_started_returns_false_after_stop
-    @reporter.register_collector(:test) {}
+    @reporter.enable_integration(:test)
     @reporter.start!
     @reporter.stop!
     refute @reporter.started?
   end
 
   def test_start_is_idempotent
-    @reporter.register_collector(:test) {}
+    @reporter.enable_integration(:test)
     @reporter.start!
     thread1 = @reporter.thread
 
@@ -112,27 +113,27 @@ class MetricReporterTest < SpeedshopCloudwatchTest
   end
 
   def test_started_detects_pid_change
-    @reporter.register_collector(:test) {}
+    @reporter.enable_integration(:test)
     @reporter.start!
-    original_pid = @reporter.instance_variable_get(:@pid)
+    original_pid = @reporter.pid
 
-    @reporter.instance_variable_set(:@pid, original_pid + 1)
+    @reporter.pid = original_pid + 1
 
     refute @reporter.started?
   end
 
   def test_started_detects_dead_thread
-    @reporter.register_collector(:test) {}
+    @reporter.enable_integration(:test)
     @reporter.start!
-    @reporter.instance_variable_get(:@thread).kill
-    @reporter.instance_variable_get(:@thread).join
+    @reporter.thread.kill
+    @reporter.thread.join
 
     refute @reporter.started?
   end
 
   def test_adds_custom_dimensions_to_metrics
     @config.dimensions = {ServiceName: "myservice-api", Environment: "production"}
-    @reporter.register_collector(:test) {}
+    @reporter.enable_integration(:test)
     @reporter.report(metric: :test_metric, value: 42, dimensions: {Region: "us-east-1"})
 
     queue = @reporter.queue
@@ -153,7 +154,7 @@ class MetricReporterTest < SpeedshopCloudwatchTest
   end
 
   def test_works_without_custom_dimensions
-    @reporter.register_collector(:test) {}
+    @reporter.enable_integration(:test)
     @reporter.report(metric: :test_metric, value: 42, dimensions: {Region: "us-east-1"})
 
     queue = @reporter.queue
@@ -166,7 +167,7 @@ class MetricReporterTest < SpeedshopCloudwatchTest
 
   def test_custom_dimensions_with_no_metric_dimensions
     @config.dimensions = {ServiceName: "myservice-api"}
-    @reporter.register_collector(:test) {}
+    @reporter.enable_integration(:test)
     @reporter.report(metric: :test_metric, value: 42)
 
     queue = @reporter.queue
@@ -178,7 +179,7 @@ class MetricReporterTest < SpeedshopCloudwatchTest
   end
 
   def test_lazy_startup_on_first_report
-    @reporter.register_collector(:test) {}
+    @reporter.enable_integration(:test)
     refute @reporter.started?
 
     @reporter.report(metric: :test_metric, value: 42)
@@ -188,7 +189,7 @@ class MetricReporterTest < SpeedshopCloudwatchTest
   end
 
   def test_lazy_startup_does_not_double_start
-    @reporter.register_collector(:test) {}
+    @reporter.enable_integration(:test)
     refute @reporter.started?
 
     @reporter.report(metric: :metric1, value: 1)
@@ -201,7 +202,7 @@ class MetricReporterTest < SpeedshopCloudwatchTest
   end
 
   def test_lazy_startup_restarts_after_stop
-    @reporter.register_collector(:test) {}
+    @reporter.enable_integration(:test)
     @reporter.report(metric: :metric1, value: 1)
     assert @reporter.started?
 

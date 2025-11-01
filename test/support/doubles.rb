@@ -1,31 +1,29 @@
 # frozen_string_literal: true
 
 module TestDoubles
-  class ReporterDouble
-    attr_reader :collectors, :metrics_collected
+  class LoggerDouble
+    attr_reader :errors, :debugs, :infos
 
     def initialize
-      @collectors = []
-      @metrics_collected = []
+      @errors = []
+      @debugs = []
+      @infos = []
     end
 
-    def report(metric:, value:, dimensions: {}, namespace: nil)
-      dims = dimensions.map { |k, v| {name: k.to_s, value: v.to_s} }
-      @metrics_collected << {name: metric.to_s, value: value, dimensions: dims, namespace: namespace}
+    def error(msg)
+      @errors << msg
     end
 
-    def register_collector(integration, &block)
-      @collectors << {integration: integration, block: block}
+    def debug(msg)
+      @debugs << msg
     end
-  end
 
-  class QueueDouble
-    attr_reader :name, :size, :latency
+    def info(msg)
+      @infos << msg
+    end
 
-    def initialize(name, size, latency)
-      @name = name
-      @size = size
-      @latency = latency
+    def error_logged?(pattern)
+      @errors.any? { |msg| msg.include?(pattern) }
     end
   end
 
@@ -58,18 +56,6 @@ module TestDoubles
 
     def insert_after(after_middleware, new_middleware)
       @inserted << {after: after_middleware, middleware: new_middleware}
-    end
-  end
-
-  class SidekiqConfigDouble
-    attr_reader :callbacks
-
-    def initialize
-      @callbacks = {}
-    end
-
-    def on(event, &block)
-      @callbacks[event] = block
     end
   end
 

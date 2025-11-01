@@ -9,8 +9,8 @@ class CloudwatchTest < SpeedshopCloudwatchTest
       yielded_config = config
     end
 
-    assert_kind_of Speedshop::Cloudwatch::Configuration, yielded_config
-    assert_kind_of Speedshop::Cloudwatch::Configuration, result
+    assert_kind_of Speedshop::Cloudwatch::Config, yielded_config
+    assert_kind_of Speedshop::Cloudwatch::Config, result
   end
 
   def test_configure_allows_setting_options
@@ -23,7 +23,7 @@ class CloudwatchTest < SpeedshopCloudwatchTest
 
   def test_config_returns_configuration_instance
     config = Speedshop::Cloudwatch.config
-    assert_kind_of Speedshop::Cloudwatch::Configuration, config
+    assert_kind_of Speedshop::Cloudwatch::Config, config
   end
 
   def test_reporter_returns_metric_reporter_instance
@@ -33,11 +33,6 @@ class CloudwatchTest < SpeedshopCloudwatchTest
     end
 
     reporter = Speedshop::Cloudwatch.reporter
-    assert_kind_of Speedshop::Cloudwatch::MetricReporter, reporter
-  end
-
-  def test_monitor_created_at_require_time
-    monitor = Speedshop::Cloudwatch.monitor
-    assert_kind_of Monitor, monitor
+    assert_kind_of Speedshop::Cloudwatch::Reporter, reporter
   end
 end

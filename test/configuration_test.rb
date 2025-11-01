@@ -4,15 +4,18 @@ require "test_helper"
 
 class ConfigurationTest < SpeedshopCloudwatchTest
   def setup
-    @config = Speedshop::Cloudwatch::Configuration.new
+    super
+    @config = Speedshop::Cloudwatch::Config.instance
   end
 
   def test_has_default_interval
-    assert_equal 60, @config.interval
+    reset_singletons
+    config = Speedshop::Cloudwatch::Config.instance
+    assert_equal 60, config.interval
   end
 
-  def test_has_nil_client_by_default
-    assert_nil @config.client
+  def test_has_default_client
+    assert_instance_of Aws::CloudWatch::Client, @config.client
   end
 
   def test_has_default_puma_metrics

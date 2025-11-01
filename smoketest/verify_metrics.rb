@@ -1,25 +1,29 @@
 require "json"
 require "cgi"
+require_relative "../lib/speedshop/cloudwatch/configuration"
 
-EXPECTED_METRICS = {
-  "Puma" => ["Workers", "BootedWorkers", "OldWorkers", "Running", "Backlog", "PoolCapacity", "MaxThreads"],
-  "Rack" => ["RequestQueueTime"],
-  "Sidekiq" => ["EnqueuedJobs", "ProcessedJobs", "FailedJobs", "ScheduledJobs", "RetryJobs", "DeadJobs", "Workers", "Processes", "DefaultQueueLatency", "Capacity", "Utilization", "QueueLatency", "QueueSize"],
-  "ActiveJob" => ["QueueLatency"]
+config = Speedshop::Cloudwatch::Configuration.instance
+
+EXPECTED_METRICS = config.metrics.transform_keys { |integration|
+  config.namespaces[integration]
+}.transform_values { |metrics|
+  metrics.map(&:to_s)
 }
 
 FORBIDDEN_METRICS = {
   "Test" => ["RakeTaskMetric"]
 }
 
-metrics_file = File.join(__dir__, "tmp", "captured_metrics.json")
+require "csv"
+
+metrics_file = File.join(__dir__, "tmp", "captured_metrics.csv")
 
 unless File.exist?(metrics_file)
   puts "❌ No metrics file found at #{metrics_file}"
   exit 1
 end
 
-captured_data = JSON.parse(File.read(metrics_file))
+captured_data = CSV.read(metrics_file, headers: true).map(&:to_h)
 
 if captured_data.empty?
   puts "❌ No metrics were captured!"

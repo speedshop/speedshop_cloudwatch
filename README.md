@@ -56,6 +56,8 @@ end
 
 ## Configuration
 
+You'll need to [configure your Cloudwatch API credentials](https://github.com/aws/aws-sdk-ruby?tab=readme-ov-file#configuration), which is usually done via ENV var.
+
 You can configure which metrics are reported, the CloudWatch namespace for each integration, and other settings:
 
 ```ruby

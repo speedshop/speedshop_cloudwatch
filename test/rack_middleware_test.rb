@@ -18,7 +18,6 @@ class RackMiddlewareTest < SpeedshopCloudwatchTest
 
   def configure_cloudwatch_for_test(**overrides)
     Speedshop::Cloudwatch.configure do |config|
-      config.client = @client
       config.interval = 60
       config.logger = Logger.new(nil)
       overrides.each { |k, v| config.public_send(:"#{k}=", v) }
@@ -64,8 +63,6 @@ class RackMiddlewareTest < SpeedshopCloudwatchTest
 
   def test_uses_configured_namespace
     Speedshop::Cloudwatch.configure do |config|
-      config.client = @client
-      config.interval = 60
       config.namespaces[:rack] = "MyApp/Rack"
     end
 
@@ -80,14 +77,9 @@ class RackMiddlewareTest < SpeedshopCloudwatchTest
   end
 
   def test_logs_error_when_collection_fails
-    error_logged = false
-    logger = Object.new
-    logger.define_singleton_method(:error) { |msg| error_logged = true if msg.include?("Failed to collect Rack metrics") }
-    logger.define_singleton_method(:debug) { |msg| }
-    logger.define_singleton_method(:info) { |msg| }
+    logger = TestDoubles::LoggerDouble.new
 
     Speedshop::Cloudwatch.configure do |config|
-      config.client = @client
       config.logger = logger
     end
 
@@ -100,6 +92,6 @@ class RackMiddlewareTest < SpeedshopCloudwatchTest
       assert_equal 200, status
     end
 
-    assert error_logged, "Expected error to be logged"
+    assert logger.error_logged?("Failed to collect Rack metrics"), "Expected error to be logged"
   end
 end

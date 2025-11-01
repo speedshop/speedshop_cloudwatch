@@ -1,12 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
-
-begin
-  require "active_job"
-rescue LoadError
-  return
-end
+require "active_job"
 
 ActiveJob::Base.queue_adapter = :test
 ActiveJob::Base.logger = Logger.new(nil)
@@ -24,17 +19,8 @@ end
 class ActiveJobTest < SpeedshopCloudwatchTest
   def setup
     super
-    Speedshop::Cloudwatch.config.namespaces[:active_job] = "ActiveJob"
     ActiveJob::Base.queue_adapter.enqueued_jobs.clear
     ActiveJob::Base.queue_adapter.performed_jobs.clear
-  end
-
-  def test_active_job_module_is_defined
-    assert defined?(Speedshop::Cloudwatch::ActiveJob)
-  end
-
-  def test_active_job_has_included_method
-    assert_respond_to Speedshop::Cloudwatch::ActiveJob, :included
   end
 
   def test_reports_queue_time_when_job_executes
@@ -118,11 +104,7 @@ class ActiveJobTest < SpeedshopCloudwatchTest
   end
 
   def test_logs_error_when_collection_fails
-    error_logged = false
-    logger = Object.new
-    logger.define_singleton_method(:error) { |msg| error_logged = true if msg.include?("Failed to collect ActiveJob metrics") }
-    logger.define_singleton_method(:debug) { |msg| }
-    logger.define_singleton_method(:info) { |msg| }
+    logger = TestDoubles::LoggerDouble.new
 
     Speedshop::Cloudwatch.configure do |config|
       config.logger = logger
@@ -134,6 +116,6 @@ class ActiveJobTest < SpeedshopCloudwatchTest
       assert_equal "test_arg", result
     end
 
-    assert error_logged, "Expected error to be logged"
+    assert logger.error_logged?("Failed to collect ActiveJob metrics"), "Expected error to be logged"
   end
 end

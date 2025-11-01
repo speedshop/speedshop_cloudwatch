@@ -9,4 +9,5 @@ Rails.application.configure do
   config.active_support.deprecation = :log
   config.active_support.disallowed_deprecation = :raise
   config.active_support.disallowed_deprecation_warnings = []
+  config.log_level = :debug
 end

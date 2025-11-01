@@ -5,11 +5,8 @@ ruby_version: 2.7
 ignore:
   - 'smoketest/**/*'
 
-require:
-  - ./.rubocop/forbidden_methods.rb
+extend_config:
+  - .rubocop.yml
 
 Layout/LineLength:
   Max: 120
-
-Custom/ForbiddenMethods:
-  Enabled: true
