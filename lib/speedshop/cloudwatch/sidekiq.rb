@@ -10,7 +10,6 @@ module Speedshop
           @namespace = namespace || Speedshop::Cloudwatch.config.namespaces[:sidekiq]
           @reporter = reporter
           @process_metrics = process_metrics
-          @reporter.register_collector { collect_metrics }
           setup_lifecycle_hooks if defined?(::Sidekiq)
         end
 
@@ -18,21 +17,22 @@ module Speedshop
 
         def setup_lifecycle_hooks
           ::Sidekiq.configure_server do |config|
+            # Sidekiq Enterprise has a leader process; OSS does not.
+            # Use :leader event for Enterprise to avoid duplicate reporting from all processes.
+            # Use :startup event for OSS since it fires once per process.
             event = defined?(::Sidekiq::Enterprise) ? :leader : :startup
 
             config.on(event) do
-              # Enable reporting only for leader (Enterprise) or on startup (OSS)
-              Speedshop::Cloudwatch.config.enabled[:sidekiq] = true
+              @reporter.register_collector(:sidekiq) { collect_metrics }
             end
 
             config.on(:quiet) do
-              # Disable reporting when shutting down
-              Speedshop::Cloudwatch.config.enabled[:sidekiq] = false
+              @reporter.unregister_collector(:sidekiq)
               @reporter.stop!
             end
 
             config.on(:shutdown) do
-              Speedshop::Cloudwatch.config.enabled[:sidekiq] = false
+              @reporter.unregister_collector(:sidekiq)
               @reporter.stop!
             end
           end
@@ -79,8 +79,8 @@ module Speedshop
 
         def report_process_metrics(processes)
           processes.each do |p|
+            next if p["concurrency"].zero?
             util = p["busy"] / p["concurrency"].to_f * 100.0
-            next if util.nan?
             dims = [{name: "Hostname", value: p["hostname"]}]
             dims << {name: "Tag", value: p["tag"]} if p["tag"] && !p["tag"].to_s.empty?
             @reporter.report("Utilization", util, namespace: @namespace, unit: "Percent", dimensions: dims)
@@ -89,6 +89,9 @@ module Speedshop
 
         def report_queue_metrics
           configured = Speedshop::Cloudwatch.config.sidekiq_queues
+          # This whole thing is a bit expensive, both for us and for the Redis
+          # instance. So, we're trying to minimize Redis load and work in this
+          # whole section.
           all_queues = ::Sidekiq::Queue.all
           queues = (configured.nil? || configured.empty?) ? all_queues : all_queues.select { |q| configured.include?(q.name) }
           queues.each do |q|

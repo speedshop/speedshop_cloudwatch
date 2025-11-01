@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require "aws-sdk-cloudwatch"
-require "singleton"
+require "monitor"
 require "speedshop/cloudwatch/active_job"
 require "speedshop/cloudwatch/configuration"
 require "speedshop/cloudwatch/metric_reporter"
@@ -13,24 +13,35 @@ require "speedshop/cloudwatch/version"
 module Speedshop
   module Cloudwatch
     class Error < StandardError; end
-    @reporter_mutex = Mutex.new
+    @monitor = Monitor.new
 
     class << self
-      attr_reader :reporter_mutex
+      attr_reader :monitor
 
       def configure
-        @config ||= Configuration.new
-        yield @config if block_given?
-        @config
+        @monitor.synchronize do
+          @config ||= Configuration.new
+          yield @config if block_given?
+          @config
+        end
       end
 
       def config
-        @config ||= Configuration.new
+        return @config if defined?(@config) && @config
+        @monitor.synchronize { @config ||= Configuration.new }
+      end
+
+      def config=(value)
+        @monitor.synchronize { @config = value }
       end
 
       def reporter
-        return @reporter if defined?(@reporter)
-        @reporter_mutex.synchronize { @reporter = MetricReporter.new(config: config) }
+        return @reporter if defined?(@reporter) && @reporter
+        @reporter = MetricReporter.new(config: config)
+      end
+
+      def reporter=(value)
+        @monitor.synchronize { @reporter = value }
       end
 
       def log_info(msg)

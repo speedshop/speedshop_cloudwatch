@@ -3,14 +3,12 @@
 require "test_helper"
 require "puma"
 
-class PumaTest < Minitest::Test
+class PumaTest < SpeedshopCloudwatchTest
   def test_puma_integration_is_defined
     assert defined?(Speedshop::Cloudwatch::Puma)
   end
 
   def test_collects_metrics_with_single_mode_stats
-    reporter = TestDoubles::ReporterDouble.new
-
     stub_puma_stats = {
       workers: 0,
       booted_workers: 0,
@@ -21,11 +19,7 @@ class PumaTest < Minitest::Test
       max_threads: 5
     }
 
-    ::Puma.stub(:stats_hash, stub_puma_stats) do
-      Speedshop::Cloudwatch::Puma.register(namespace: "Puma", reporter: reporter)
-      collector = reporter.collectors.last
-      collector.call
-    end
+    reporter = run_puma_collector_with_stats(stub_puma_stats)
 
     metric_names = reporter.metrics_collected.map { |m| m[:name] }
     refute_includes metric_names, "Workers"
@@ -47,14 +41,17 @@ class PumaTest < Minitest::Test
 
   private
 
-  def collect_clustered_puma_metrics
-    reporter = TestDoubles::ReporterDouble.new
-    stub_puma_stats = clustered_puma_stats
-    ::Puma.stub(:stats_hash, stub_puma_stats) do
+  def run_puma_collector_with_stats(stats, reporter: TestDoubles::ReporterDouble.new)
+    ::Puma.stub(:stats_hash, stats) do
       Speedshop::Cloudwatch::Puma.register(namespace: "Puma", reporter: reporter)
-      reporter.collectors.last.call
+      collector = reporter.collectors.last
+      collector[:block].call
     end
     reporter
+  end
+
+  def collect_clustered_puma_metrics
+    run_puma_collector_with_stats(clustered_puma_stats)
   end
 
   def clustered_puma_stats
@@ -103,15 +100,8 @@ class PumaTest < Minitest::Test
       config.namespaces[:puma] = "MyApp/Puma"
     end
 
-    reporter = TestDoubles::ReporterDouble.new
-
     stub_puma_stats = {workers: 1, booted_workers: 1, old_workers: 0, running: 5, backlog: 0, pool_capacity: 5, max_threads: 5}
-
-    ::Puma.stub(:stats_hash, stub_puma_stats) do
-      Speedshop::Cloudwatch::Puma.register(reporter: reporter)
-      collector = reporter.collectors.last
-      collector.call
-    end
+    reporter = run_puma_collector_with_stats(stub_puma_stats)
 
     assert reporter.metrics_collected.all? { |m| m[:namespace] == "MyApp/Puma" }, "Expected all metrics to use 'MyApp/Puma' namespace"
   end
@@ -127,13 +117,7 @@ class PumaTest < Minitest::Test
       config.logger = logger
     end
 
-    reporter = TestDoubles::ReporterDouble.new
-
-    ::Puma.stub(:stats_hash, -> { raise "boom" }) do
-      Speedshop::Cloudwatch::Puma.register(namespace: "Puma", reporter: reporter)
-      collector = reporter.collectors.last
-      collector.call
-    end
+    run_puma_collector_with_stats(-> { raise "boom" })
 
     assert error_logged, "Expected error to be logged"
   end

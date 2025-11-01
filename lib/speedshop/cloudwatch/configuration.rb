@@ -5,12 +5,11 @@ require "logger"
 module Speedshop
   module Cloudwatch
     class Configuration
-      attr_accessor :interval, :client, :enabled, :metrics, :namespaces, :logger, :sidekiq_queues, :dimensions
+      attr_accessor :interval, :client, :metrics, :namespaces, :logger, :sidekiq_queues, :dimensions
 
       def initialize
         @interval = 60
         @client = nil
-        @enabled = {puma: true, sidekiq: true, rack: true, active_job: true}
         @metrics = {
           puma: [:Workers, :BootedWorkers, :OldWorkers, :Running, :Backlog, :PoolCapacity, :MaxThreads],
           sidekiq: [

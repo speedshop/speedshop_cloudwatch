@@ -21,15 +21,10 @@ class TestJob < ActiveJob::Base
   end
 end
 
-class ActiveJobTest < Minitest::Test
+class ActiveJobTest < SpeedshopCloudwatchTest
   def setup
-    @client = Minitest::Mock.new
-    Speedshop::Cloudwatch.configure do |config|
-      config.client = @client
-      config.interval = 60
-      config.logger = Logger.new(nil)
-      config.namespaces[:active_job] = "ActiveJob"
-    end
+    super
+    Speedshop::Cloudwatch.config.namespaces[:active_job] = "ActiveJob"
     ActiveJob::Base.queue_adapter.enqueued_jobs.clear
     ActiveJob::Base.queue_adapter.performed_jobs.clear
   end
@@ -112,23 +107,6 @@ class ActiveJobTest < Minitest::Test
     end
 
     assert_equal "MyApp/Jobs", reported_namespace
-  end
-
-  def test_respects_active_job_enabled_flag
-    Speedshop::Cloudwatch.configure do |config|
-      config.enabled[:active_job] = false
-    end
-
-    job = TestJob.new("test_arg")
-    job.enqueued_at = Time.now.to_f - 1.0
-
-    reporter = Speedshop::Cloudwatch.reporter
-    queue = reporter.queue
-    initial_size = queue.size
-
-    job.perform_now
-
-    assert_equal initial_size, queue.size
   end
 
   def test_respects_active_job_metrics_whitelist

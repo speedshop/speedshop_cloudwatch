@@ -7,7 +7,7 @@ module Speedshop
         def register(namespace: nil, reporter: Speedshop::Cloudwatch.reporter)
           @namespace = namespace || Speedshop::Cloudwatch.config.namespaces[:puma]
           @reporter = reporter
-          @reporter.register_collector { collect_metrics }
+          @reporter.register_collector(:puma) { collect_metrics }
         end
 
         private
@@ -18,6 +18,7 @@ module Speedshop
 
           if stats[:worker_status]
             %i[workers booted_workers old_workers].each do |m|
+              # Submit to SnakeCase tyranny
               metric_name = m.to_s.split("_").map(&:capitalize).join
               @reporter.report(metric_name, stats[m] || 0, namespace: @namespace, unit: "Count")
             end

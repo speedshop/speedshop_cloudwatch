@@ -2,7 +2,7 @@
 
 require "test_helper"
 
-class CloudwatchTest < Minitest::Test
+class CloudwatchTest < SpeedshopCloudwatchTest
   def test_configure_yields_configuration
     yielded_config = nil
     result = Speedshop::Cloudwatch.configure do |config|
@@ -16,11 +16,9 @@ class CloudwatchTest < Minitest::Test
   def test_configure_allows_setting_options
     config = Speedshop::Cloudwatch.configure do |c|
       c.interval = 120
-      c.enabled[:puma] = false
     end
 
     assert_equal 120, config.interval
-    refute config.enabled[:puma]
   end
 
   def test_config_returns_configuration_instance
@@ -38,8 +36,8 @@ class CloudwatchTest < Minitest::Test
     assert_kind_of Speedshop::Cloudwatch::MetricReporter, reporter
   end
 
-  def test_reporter_mutex_created_at_require_time
-    mutex = Speedshop::Cloudwatch.reporter_mutex
-    assert_kind_of Mutex, mutex
+  def test_monitor_created_at_require_time
+    monitor = Speedshop::Cloudwatch.monitor
+    assert_kind_of Monitor, monitor
   end
 end

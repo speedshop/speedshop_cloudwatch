@@ -3,6 +3,7 @@
 require:
   - standard
   - ./.rubocop/forbidden_methods.rb
+  - ./.rubocop/test_base_class.rb
 
 inherit_gem:
   standard: config/base.yml
@@ -14,4 +15,7 @@ Layout/LineLength:
   Max: 120
 
 Custom/ForbiddenMethods:
+  Enabled: true
+
+Custom/TestBaseClass:
   Enabled: true

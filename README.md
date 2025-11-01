@@ -10,29 +10,26 @@ This library supports **Ruby 2.7+, Sidekiq 7+, and Puma 6+**.
 
 ## Metrics
 
-If not configured, all metrics are enabled by default. Here are the default metric lists you can copy and customize:
-
-**Puma:**
-```ruby
-config.metrics[:puma] = [:Workers, :BootedWorkers, :OldWorkers, :Running, :Backlog, :PoolCapacity, :MaxThreads]
-```
-
-**Sidekiq:**
-```ruby
-config.metrics[:sidekiq] = [:EnqueuedJobs, :ProcessedJobs, :FailedJobs, :ScheduledJobs, :RetryJobs, :DeadJobs, :Workers, :Processes, :DefaultQueueLatency, :Capacity, :Utilization, :QueueLatency, :QueueSize]
-```
-
-**Rack:**
-```ruby
-config.metrics[:rack] = [:RequestQueueTime]
-```
-
-**ActiveJob:**
-```ruby
-config.metrics[:active_job] = [:QueueLatency]
-```
+If not configured, all metrics are enabled by default.
 
 For a full explanation of every metric, [read our docs.](./docs/metrics.md)
+
+```ruby
+# Defaults. Copy and modify this list to customize.
+config.metrics[:puma] = [
+  :Workers, :BootedWorkers, :OldWorkers, :Running, :Backlog, :PoolCapacity, :MaxThreads
+]
+
+config.metrics[:sidekiq] = [
+  :EnqueuedJobs, :ProcessedJobs, :FailedJobs, :ScheduledJobs, :RetryJobs,
+  :DeadJobs, :Workers, :Processes, :DefaultQueueLatency, :Capacity,
+  :Utilization, :QueueLatency, :QueueSize
+]
+
+config.metrics[:rack] = [:RequestQueueTime]
+
+config.metrics[:active_job] = [:QueueLatency]
+```
 
 This gem is for **infrastructure and queue metrics**, not application performance metrics, like response times, job execution times, or error rates. Use your APM for that stuff.
 
@@ -46,6 +43,7 @@ gem `speedshop_cloudwatch`
 # config/initializers/speedshop-cloudwatch.rb
 Speedshop::Cloudwatch::Puma.register
 Speedshop::Cloudwatch::Sidekiq.register
+# If you're not using Rails, see the section on `Rack` below.
 ```
 
 ```ruby
@@ -58,7 +56,7 @@ end
 
 ## Configuration
 
-You can configure which integrations are enabled, which metrics are reported, and the CloudWatch namespace for each integration:
+You can configure which metrics are reported, the CloudWatch namespace for each integration, and other settings:
 
 ```ruby
 Speedshop::Cloudwatch.configure do |config|
@@ -67,9 +65,6 @@ Speedshop::Cloudwatch.configure do |config|
 
   # Optional: Custom logger (defaults to Rails.logger if available, otherwise STDOUT)
   config.logger = Logger.new(Rails.root.join("log", "cloudwatch.log"))
-
-  # Disable an entire integration.
-  config.enabled[:rack] = false
 
   # Customize which metrics to report (whitelist)
   config.metrics[:puma] = [:Workers, :BootedWorkers, :Running, :Backlog]
@@ -196,4 +191,19 @@ require 'speedshop/cloudwatch'
 Rails.application.config.middleware.insert_before 0, Speedshop::Cloudwatch::RackMiddleware
 
 # At this point, the auto-disable behavior in Rake is disabled. You'll have to re-implement yourself.
+```
+
+### Disabling Integrations
+
+In general, the best way to disable an integration is to never register it in the first place.
+
+* **Puma** is only enabled when you explicitly `Speedshop::Cloudwatch::Puma.register`.
+* **Sidekiq** is the same via `Speedshop::Cloudwatch::Sidekiq.register`.
+* **Rack** is included automatically with Rails. See Rails integration below for how to disable this.
+* **ActiveJob** is only enabled when you add `include Speedshop::Cloudwatch::ActiveJob`.
+
+If for some reason you want to disable an integration _after_ this registration, you can:
+
+```ruby
+
 ```

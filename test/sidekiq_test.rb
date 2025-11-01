@@ -5,8 +5,9 @@ require "sidekiq"
 require "sidekiq/api"
 require "connection_pool"
 
-class SidekiqTest < Minitest::Test
+class SidekiqTest < SpeedshopCloudwatchTest
   def setup
+    super
     Sidekiq.configure_client do |config|
       config.redis = {url: "redis://localhost:6379/15"}
       config.logger = Logger.new(nil)
@@ -22,6 +23,7 @@ class SidekiqTest < Minitest::Test
 
   def teardown
     Sidekiq.redis(&:flushdb)
+    super
   end
 
   def test_sidekiq_integration_is_defined
@@ -29,33 +31,20 @@ class SidekiqTest < Minitest::Test
   end
 
   def test_can_register_collector
-    client = Minitest::Mock.new
-    reporter = Speedshop::Cloudwatch::MetricReporter.new(
-      config: Speedshop::Cloudwatch::Configuration.new.tap do |c|
-        c.client = client
-        c.interval = 60
-        c.logger = Logger.new(nil)
-      end
-    )
+    reporter = create_test_reporter
 
-    ::Sidekiq.stub(:configure_server, proc { |&block| block.call(@sidekiq_config_mock) }) do
+    stub_sidekiq_configure_server do
       Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter)
+      @sidekiq_config_mock.callbacks[:startup].call
     end
 
     assert_equal 1, reporter.collectors.size
   end
 
   def test_lifecycle_hooks_registered_for_oss
-    client = Minitest::Mock.new
-    reporter = Speedshop::Cloudwatch::MetricReporter.new(
-      config: Speedshop::Cloudwatch::Configuration.new.tap do |c|
-        c.client = client
-        c.interval = 60
-        c.logger = Logger.new(nil)
-      end
-    )
+    reporter = create_test_reporter
 
-    ::Sidekiq.stub(:configure_server, proc { |&block| block.call(@sidekiq_config_mock) }) do
+    stub_sidekiq_configure_server do
       Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter)
     end
 
@@ -85,6 +74,29 @@ class SidekiqTest < Minitest::Test
 
   private
 
+  def create_test_reporter
+    client = Minitest::Mock.new
+    Speedshop::Cloudwatch::MetricReporter.new(
+      config: Speedshop::Cloudwatch::Configuration.new.tap do |c|
+        c.client = client
+        c.interval = 60
+        c.logger = Logger.new(nil)
+      end
+    )
+  end
+
+  def stub_sidekiq_configure_server(&block)
+    ::Sidekiq.stub(:configure_server, proc { |&blk| blk.call(@sidekiq_config_mock) }, &block)
+  end
+
+  def configure_cloudwatch_for_test
+    Speedshop::Cloudwatch.configure do |config|
+      config.client = Minitest::Mock.new
+      config.interval = 60
+      config.logger = Logger.new(nil)
+    end
+  end
+
   def sample_queues
     [
       TestDoubles::QueueDouble.new("critical", 1, 1.5),
@@ -105,9 +117,10 @@ class SidekiqTest < Minitest::Test
   def collect_sidekiq_queue_names
     test_reporter = TestDoubles::ReporterDouble.new
     ::Sidekiq::Queue.stub(:all, sample_queues) do
-      ::Sidekiq.stub(:configure_server, proc { |&block| block.call(@sidekiq_config_mock) }) do
+      stub_sidekiq_configure_server do
         Speedshop::Cloudwatch::Sidekiq.register(reporter: test_reporter)
-        test_reporter.collectors.last.call
+        @sidekiq_config_mock.callbacks[:startup].call
+        test_reporter.collectors.last[:block].call
       end
     end
 
@@ -116,20 +129,13 @@ class SidekiqTest < Minitest::Test
   end
 
   def test_lifecycle_hooks_registered_for_enterprise
-    client = Minitest::Mock.new
-    reporter = Speedshop::Cloudwatch::MetricReporter.new(
-      config: Speedshop::Cloudwatch::Configuration.new.tap do |c|
-        c.client = client
-        c.interval = 60
-        c.logger = Logger.new(nil)
-      end
-    )
+    reporter = create_test_reporter
 
     enterprise_module = Module.new
     ::Sidekiq.const_set(:Enterprise, enterprise_module)
 
     begin
-      ::Sidekiq.stub(:configure_server, proc { |&block| block.call(@sidekiq_config_mock) }) do
+      stub_sidekiq_configure_server do
         Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter)
       end
 
@@ -143,43 +149,32 @@ class SidekiqTest < Minitest::Test
   end
 
   def test_lifecycle_hooks_call_reporter_methods
-    client = Minitest::Mock.new
-
-    Speedshop::Cloudwatch.configure do |config|
-      config.client = client
-      config.interval = 60
-      config.logger = Logger.new(nil)
-    end
-
+    configure_cloudwatch_for_test
     reporter = Speedshop::Cloudwatch.reporter
 
-    ::Sidekiq.stub(:configure_server, proc { |&block| block.call(@sidekiq_config_mock) }) do
+    stub_sidekiq_configure_server do
       Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter)
     end
 
-    Speedshop::Cloudwatch.config.enabled[:sidekiq] = false
+    assert_equal 0, reporter.collectors.size, "Sidekiq should not be registered yet"
     @sidekiq_config_mock.callbacks[:startup].call
-    assert Speedshop::Cloudwatch.config.enabled[:sidekiq], "Sidekiq should be enabled after startup"
+    assert_equal 1, reporter.collectors.size, "Sidekiq should be registered after startup"
 
     @sidekiq_config_mock.callbacks[:quiet].call
-    refute Speedshop::Cloudwatch.config.enabled[:sidekiq], "Sidekiq should be disabled after quiet"
+    assert_equal 0, reporter.collectors.size, "Sidekiq should be unregistered after quiet"
     refute reporter.running, "Reporter should be stopped after quiet"
   end
 
   def test_collects_all_metrics_with_real_sidekiq_data
-    Speedshop::Cloudwatch.configure do |config|
-      config.client = Minitest::Mock.new
-      config.interval = 60
-      config.logger = Logger.new(nil)
-    end
-
+    configure_cloudwatch_for_test
     reporter = TestDoubles::ReporterDouble.new
 
-    ::Sidekiq.stub(:configure_server, proc { |&block| block.call(@sidekiq_config_mock) }) do
+    stub_sidekiq_configure_server do
       Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter, process_metrics: true)
+      @sidekiq_config_mock.callbacks[:startup].call
 
       collector = reporter.collectors.last
-      collector.call
+      collector[:block].call
     end
 
     metric_names = reporter.metrics_collected.map { |m| m[:name] }
@@ -196,19 +191,15 @@ class SidekiqTest < Minitest::Test
   end
 
   def test_process_metrics_can_be_disabled
-    Speedshop::Cloudwatch.configure do |config|
-      config.client = Minitest::Mock.new
-      config.interval = 60
-      config.logger = Logger.new(nil)
-    end
-
+    configure_cloudwatch_for_test
     reporter = TestDoubles::ReporterDouble.new
 
-    ::Sidekiq.stub(:configure_server, proc { |&block| block.call(@sidekiq_config_mock) }) do
+    stub_sidekiq_configure_server do
       Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter, process_metrics: false)
+      @sidekiq_config_mock.callbacks[:startup].call
 
       collector = reporter.collectors.last
-      collector.call
+      collector[:block].call
     end
 
     process_utilization_metrics = reporter.metrics_collected.select do |m|
@@ -231,10 +222,11 @@ class SidekiqTest < Minitest::Test
     reporter = TestDoubles::ReporterDouble.new
 
     ::Sidekiq::Stats.stub(:new, -> { raise "boom" }) do
-      ::Sidekiq.stub(:configure_server, proc { |&block| block.call(@sidekiq_config_mock) }) do
+      stub_sidekiq_configure_server do
         Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter)
+        @sidekiq_config_mock.callbacks[:startup].call
         collector = reporter.collectors.last
-        collector.call
+        collector[:block].call
       end
     end
 

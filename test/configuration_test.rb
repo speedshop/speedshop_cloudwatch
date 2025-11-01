@@ -2,7 +2,7 @@
 
 require "test_helper"
 
-class ConfigurationTest < Minitest::Test
+class ConfigurationTest < SpeedshopCloudwatchTest
   def setup
     @config = Speedshop::Cloudwatch::Configuration.new
   end
@@ -13,13 +13,6 @@ class ConfigurationTest < Minitest::Test
 
   def test_has_nil_client_by_default
     assert_nil @config.client
-  end
-
-  def test_has_all_integrations_enabled_by_default
-    assert @config.enabled[:puma]
-    assert @config.enabled[:sidekiq]
-    assert @config.enabled[:rack]
-    assert @config.enabled[:active_job]
   end
 
   def test_has_default_puma_metrics
@@ -75,11 +68,6 @@ class ConfigurationTest < Minitest::Test
     client = Object.new
     @config.client = client
     assert_same client, @config.client
-  end
-
-  def test_allows_disabling_integrations
-    @config.enabled[:puma] = false
-    refute @config.enabled[:puma]
   end
 
   def test_allows_customizing_metrics

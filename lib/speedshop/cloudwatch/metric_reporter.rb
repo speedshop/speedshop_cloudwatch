@@ -11,6 +11,7 @@ module Speedshop
         @mutex = Mutex.new
         @queue = []
         @collectors = []
+        @registered_integrations = Set.new
         @thread = @pid = nil
         @running = false
       end
@@ -20,11 +21,16 @@ module Speedshop
 
         @mutex.synchronize do
           return if started?
-          return Speedshop::Cloudwatch.log_info("No integrations enabled, not starting reporter") unless @config.enabled.values.any?
+          return Speedshop::Cloudwatch.log_info("No integrations registered, not starting reporter") if @collectors.empty?
           Speedshop::Cloudwatch.log_info("Starting metric reporter (interval: #{@config.interval}s)")
+          # Puma and Sidekiq Swarm both fork. We need to safely deal with that.
+          # After a fork, the background thread is dead, so we start a new one.
+          # We track the pid to know if we've forked.
           @pid = Process.pid
           @running = true
           @thread = Thread.new do
+            # This bit is to tell Puma that this thread is fork-safe, so it won't
+            # log anything.
             Thread.current.thread_variable_set(:fork_safe, true)
             run_loop
           end
@@ -49,6 +55,11 @@ module Speedshop
 
       def report(metric_name, value, namespace:, unit: "None", dimensions: [])
         integration = @config.namespaces.key(namespace)
+
+        if integration && [:rack, :active_job].include?(integration)
+          @mutex.synchronize { @registered_integrations << integration }
+        end
+
         return if integration && !metric_allowed?(integration, metric_name)
 
         all_dimensions = dimensions + custom_dimensions
@@ -58,11 +69,30 @@ module Speedshop
                      dimensions: all_dimensions, timestamp: Time.now}
         end
 
+        # Lazy-init of the reporter thread
         start! unless started?
       end
 
-      def register_collector(&block)
-        @mutex.synchronize { @collectors << block }
+      def register_collector(integration, &block)
+        @mutex.synchronize do
+          @collectors << {integration: integration, block: block}
+          @registered_integrations << integration
+        end
+      end
+
+      def unregister_collector(integration)
+        @mutex.synchronize do
+          @collectors.reject! { |c| c[:integration] == integration }
+          @registered_integrations.delete(integration)
+        end
+      end
+
+      def clear_all
+        @mutex.synchronize do
+          @queue.clear
+          @collectors.clear
+          @registered_integrations.clear
+        end
       end
 
       private
@@ -72,7 +102,7 @@ module Speedshop
           sleep @config.interval
           @collectors.each { |c|
             begin
-              c.call
+              c[:block].call
             rescue => e
               Speedshop::Cloudwatch.log_error("Collector error: #{e.message}", e)
             end
@@ -87,6 +117,7 @@ module Speedshop
         metrics = @mutex.synchronize { @queue.empty? ? nil : @queue.dup.tap { @queue.clear } }
         return unless metrics
 
+        # We batch these up as much as we can to minimize API calls
         metrics.group_by { |m| m[:namespace] }.each do |namespace, ns_metrics|
           @config.logger.debug "Speedshop::Cloudwatch: Sending #{ns_metrics.size} metrics to namespace #{namespace}"
           metric_data = ns_metrics.map { |m| m.slice(:metric_name, :value, :unit, :timestamp, :dimensions) }
@@ -97,7 +128,7 @@ module Speedshop
       end
 
       def metric_allowed?(integration, metric_name)
-        @config.enabled[integration] && @config.metrics[integration].include?(metric_name.to_sym)
+        @registered_integrations.include?(integration) && @config.metrics[integration].include?(metric_name.to_sym)
       end
 
       def custom_dimensions

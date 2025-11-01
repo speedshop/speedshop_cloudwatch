@@ -13,8 +13,8 @@ module TestDoubles
       @metrics_collected << {name: metric_name, value: value, **options}
     end
 
-    def register_collector(&block)
-      @collectors << block
+    def register_collector(integration, &block)
+      @collectors << {integration: integration, block: block}
     end
   end
 

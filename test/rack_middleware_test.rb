@@ -3,39 +3,44 @@
 require "test_helper"
 require "rack"
 
-class RackMiddlewareTest < Minitest::Test
+class RackMiddlewareTest < SpeedshopCloudwatchTest
   def setup
+    super
     @app = ->(env) { [200, {}, ["OK"]] }
-    @client = Minitest::Mock.new
-
-    Speedshop::Cloudwatch.configure do |config|
-      config.client = @client
-      config.interval = 60
-      config.logger = Logger.new(nil)
-    end
   end
 
   def teardown
     @middleware = nil
+    super
   end
 
-  def test_processes_request_with_x_request_start
+  private
+
+  def configure_cloudwatch_for_test(**overrides)
+    Speedshop::Cloudwatch.configure do |config|
+      config.client = @client
+      config.interval = 60
+      config.logger = Logger.new(nil)
+      overrides.each { |k, v| config.public_send(:"#{k}=", v) }
+    end
+  end
+
+  def call_middleware_with_header(header_name, queue_start_ms_ago: 100)
     @middleware = Speedshop::Cloudwatch::RackMiddleware.new(@app)
+    queue_start = (Time.now.to_f * 1000) - queue_start_ms_ago
+    env = {header_name => "t=#{queue_start}"}
+    @middleware.call(env)
+  end
 
-    queue_start = (Time.now.to_f * 1000) - 100
-    env = {"HTTP_X_REQUEST_START" => "t=#{queue_start}"}
+  public
 
-    status, _headers, _body = @middleware.call(env)
+  def test_processes_request_with_x_request_start
+    status, _headers, _body = call_middleware_with_header("HTTP_X_REQUEST_START")
     assert_equal 200, status
   end
 
   def test_processes_request_with_x_queue_start
-    @middleware = Speedshop::Cloudwatch::RackMiddleware.new(@app)
-
-    queue_start = (Time.now.to_f * 1000) - 100
-    env = {"HTTP_X_QUEUE_START" => "t=#{queue_start}"}
-
-    status, _headers, _body = @middleware.call(env)
+    status, _headers, _body = call_middleware_with_header("HTTP_X_QUEUE_START")
     assert_equal 200, status
   end
 
@@ -49,20 +54,10 @@ class RackMiddlewareTest < Minitest::Test
   end
 
   def test_errors_during_metric_reporting_do_not_prevent_response
-    @middleware = Speedshop::Cloudwatch::RackMiddleware.new(@app)
-
-    Speedshop::Cloudwatch.configure do |config|
-      config.client = @client
-      config.interval = 60
-      config.logger = Logger.new(nil)
-    end
-
+    configure_cloudwatch_for_test
     reporter = Speedshop::Cloudwatch.reporter
     reporter.stub :report, ->(*) { raise "Metric reporting error" } do
-      queue_start = (Time.now.to_f * 1000) - 100
-      env = {"HTTP_X_REQUEST_START" => "t=#{queue_start}"}
-
-      status, _headers, _body = @middleware.call(env)
+      status, _headers, _body = call_middleware_with_header("HTTP_X_REQUEST_START")
       assert_equal 200, status
     end
   end
@@ -74,14 +69,11 @@ class RackMiddlewareTest < Minitest::Test
       config.namespaces[:rack] = "MyApp/Rack"
     end
 
-    @middleware = Speedshop::Cloudwatch::RackMiddleware.new(@app)
     reporter = Speedshop::Cloudwatch.reporter
 
     reported_namespace = nil
     reporter.stub :report, ->(metric_name, value, namespace:, **kwargs) { reported_namespace = namespace } do
-      queue_start = (Time.now.to_f * 1000) - 100
-      env = {"HTTP_X_REQUEST_START" => "t=#{queue_start}"}
-      @middleware.call(env)
+      call_middleware_with_header("HTTP_X_REQUEST_START")
     end
 
     assert_equal "MyApp/Rack", reported_namespace
