@@ -53,7 +53,16 @@ module Speedshop
         thread_to_join&.join
       end
 
-      def report(metric_name, value, integration:, unit: "None", dimensions: [])
+      def report(**kwargs)
+        dimensions = kwargs.delete(:dimensions) || {}
+        unit = kwargs.delete(:unit) || "None"
+
+        raise ArgumentError, "Expected exactly one metric" unless kwargs.size == 1
+        metric_name, value = kwargs.first
+
+        integration = find_integration_for_metric(metric_name)
+        return unless integration
+
         namespace = @config.namespaces[integration]
 
         if [:rack, :active_job].include?(integration)
@@ -62,14 +71,14 @@ module Speedshop
 
         return unless metric_allowed?(integration, metric_name)
 
-        all_dimensions = dimensions + custom_dimensions
+        dimensions_array = convert_dimensions(dimensions)
+        all_dimensions = dimensions_array + custom_dimensions
 
         @mutex.synchronize do
-          @queue << {metric_name: metric_name, value: value, namespace: namespace, unit: unit,
+          @queue << {metric_name: metric_name.to_s, value: value, namespace: namespace, unit: unit,
                      dimensions: all_dimensions, timestamp: Time.now}
         end
 
-        # Lazy-init of the reporter thread
         start! unless started?
       end
 
@@ -133,6 +142,21 @@ module Speedshop
 
       def custom_dimensions
         @config.dimensions.map { |name, value| {name: name.to_s, value: value.to_s} }
+      end
+
+      def find_integration_for_metric(metric_name)
+        @config.metrics.find { |int, metrics| metrics.include?(metric_name.to_sym) }&.first
+      end
+
+      def convert_dimensions(dimensions)
+        case dimensions
+        when Hash
+          dimensions.map { |k, v| {name: k.to_s, value: v.to_s} }
+        when Array
+          dimensions
+        else
+          []
+        end
       end
     end
   end
