@@ -53,8 +53,14 @@ module Speedshop
         thread_to_join&.join
       end
 
-      def report(metric_name, value, integration:, unit: "None", dimensions: [])
-        namespace = @config.namespaces[integration]
+      def report(metric:, value:, dimensions: {}, namespace: nil)
+        metric_name = metric.to_sym
+
+        integration = find_integration_for_metric(metric_name)
+        return unless integration
+
+        ns = namespace || @config.namespaces[integration]
+        unit = @config.units[metric_name] || "None"
 
         if [:rack, :active_job].include?(integration)
           @mutex.synchronize { @registered_integrations << integration }
@@ -62,14 +68,14 @@ module Speedshop
 
         return unless metric_allowed?(integration, metric_name)
 
-        all_dimensions = dimensions + custom_dimensions
+        dimensions_array = dimensions.map { |k, v| {name: k.to_s, value: v.to_s} }
+        all_dimensions = dimensions_array + custom_dimensions
 
         @mutex.synchronize do
-          @queue << {metric_name: metric_name, value: value, namespace: namespace, unit: unit,
+          @queue << {metric_name: metric_name.to_s, value: value, namespace: ns, unit: unit,
                      dimensions: all_dimensions, timestamp: Time.now}
         end
 
-        # Lazy-init of the reporter thread
         start! unless started?
       end
 
@@ -133,6 +139,10 @@ module Speedshop
 
       def custom_dimensions
         @config.dimensions.map { |name, value| {name: name.to_s, value: value.to_s} }
+      end
+
+      def find_integration_for_metric(metric_name)
+        @config.metrics.find { |int, metrics| metrics.include?(metric_name.to_sym) }&.first
       end
     end
   end

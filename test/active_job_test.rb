@@ -41,29 +41,20 @@ class ActiveJobTest < SpeedshopCloudwatchTest
     job = TestJob.new("test_arg")
     job.enqueued_at = Time.now.to_f - 2.5
 
-    reported_metric = nil
-    reported_value = nil
-    reported_integration = nil
-    reported_dimensions = nil
+    reported_kwargs = nil
 
     reporter = Speedshop::Cloudwatch.reporter
-    reporter.stub :report, ->(metric, value, integration:, unit: nil, dimensions: nil) {
-      reported_metric = metric
-      reported_value = value
-      reported_integration = integration
-      reported_dimensions = dimensions
+    reporter.stub :report, ->(**kwargs) {
+      reported_kwargs = kwargs
     } do
       job.perform_now
     end
 
-    assert_equal "QueueLatency", reported_metric
-    assert_operator reported_value, :>=, 2.5
-    assert_equal :active_job, reported_integration
-    assert_equal 2, reported_dimensions.size
-    assert_equal "JobClass", reported_dimensions[0][:name]
-    assert_equal "TestJob", reported_dimensions[0][:value]
-    assert_equal "QueueName", reported_dimensions[1][:name]
-    assert_equal "default", reported_dimensions[1][:value]
+    assert_equal :QueueLatency, reported_kwargs[:metric]
+    assert_operator reported_kwargs[:value], :>=, 2.5
+    assert_equal 2, reported_kwargs[:dimensions].size
+    assert_equal "TestJob", reported_kwargs[:dimensions][:JobClass]
+    assert_equal "default", reported_kwargs[:dimensions][:QueueName]
   end
 
   def test_does_not_report_when_enqueued_at_is_nil
@@ -98,15 +89,15 @@ class ActiveJobTest < SpeedshopCloudwatchTest
     job = TestJob.new("test_arg")
     job.enqueued_at = Time.now.to_f - 1.0
 
-    reported_integration = nil
+    reported_kwargs = nil
     reporter = Speedshop::Cloudwatch.reporter
-    reporter.stub :report, ->(metric, value, integration:, **kwargs) {
-      reported_integration = integration
+    reporter.stub :report, ->(**kwargs) {
+      reported_kwargs = kwargs
     } do
       job.perform_now
     end
 
-    assert_equal :active_job, reported_integration
+    assert_equal :QueueLatency, reported_kwargs[:metric]
   end
 
   def test_respects_active_job_metrics_whitelist

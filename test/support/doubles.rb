@@ -9,8 +9,9 @@ module TestDoubles
       @metrics_collected = []
     end
 
-    def report(metric_name, value, **options)
-      @metrics_collected << {name: metric_name, value: value, **options}
+    def report(metric:, value:, dimensions: {}, namespace: nil)
+      dims = dimensions.map { |k, v| {name: k.to_s, value: v.to_s} }
+      @metrics_collected << {name: metric.to_s, value: value, dimensions: dims, namespace: namespace}
     end
 
     def register_collector(integration, &block)
