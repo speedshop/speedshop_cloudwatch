@@ -53,14 +53,14 @@ module Speedshop
         thread_to_join&.join
       end
 
-      def report(metric_name, value, namespace:, unit: "None", dimensions: [])
-        integration = @config.namespaces.key(namespace)
+      def report(metric_name, value, integration:, unit: "None", dimensions: [])
+        namespace = @config.namespaces[integration]
 
-        if integration && [:rack, :active_job].include?(integration)
+        if [:rack, :active_job].include?(integration)
           @mutex.synchronize { @registered_integrations << integration }
         end
 
-        return if integration && !metric_allowed?(integration, metric_name)
+        return unless metric_allowed?(integration, metric_name)
 
         all_dimensions = dimensions + custom_dimensions
 

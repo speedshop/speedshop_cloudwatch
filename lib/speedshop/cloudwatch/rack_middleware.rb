@@ -12,8 +12,7 @@ module Speedshop
           # Header contains milliseconds since epoch (with optional "t=" prefix).
           if (header = env["HTTP_X_REQUEST_START"] || env["HTTP_X_QUEUE_START"])
             queue_time = (Time.now.to_f * 1000) - header.gsub("t=", "").to_f
-            namespace = Speedshop::Cloudwatch.config.namespaces[:rack]
-            Speedshop::Cloudwatch.reporter.report("RequestQueueTime", queue_time, namespace: namespace, unit: "Milliseconds")
+            Speedshop::Cloudwatch.reporter.report("RequestQueueTime", queue_time, integration: :rack, unit: "Milliseconds")
           end
         rescue => e
           Speedshop::Cloudwatch.log_error("Failed to collect Rack metrics: #{e.message}", e)

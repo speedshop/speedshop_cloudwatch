@@ -43,7 +43,7 @@ class PumaTest < SpeedshopCloudwatchTest
 
   def run_puma_collector_with_stats(stats, reporter: TestDoubles::ReporterDouble.new)
     ::Puma.stub(:stats_hash, stats) do
-      Speedshop::Cloudwatch::Puma.register(namespace: "Puma", reporter: reporter)
+      Speedshop::Cloudwatch::Puma.register(reporter: reporter)
       collector = reporter.collectors.last
       collector[:block].call
     end

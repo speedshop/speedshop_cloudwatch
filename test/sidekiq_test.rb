@@ -34,7 +34,7 @@ class SidekiqTest < SpeedshopCloudwatchTest
     reporter = create_test_reporter
 
     stub_sidekiq_configure_server do
-      Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter)
+      Speedshop::Cloudwatch::Sidekiq.register(reporter: reporter)
       @sidekiq_config_mock.callbacks[:startup].call
     end
 
@@ -45,7 +45,7 @@ class SidekiqTest < SpeedshopCloudwatchTest
     reporter = create_test_reporter
 
     stub_sidekiq_configure_server do
-      Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter)
+      Speedshop::Cloudwatch::Sidekiq.register(reporter: reporter)
     end
 
     assert @sidekiq_config_mock.callbacks.key?(:startup), "Expected :startup hook to be registered"
@@ -136,7 +136,7 @@ class SidekiqTest < SpeedshopCloudwatchTest
 
     begin
       stub_sidekiq_configure_server do
-        Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter)
+        Speedshop::Cloudwatch::Sidekiq.register(reporter: reporter)
       end
 
       assert @sidekiq_config_mock.callbacks.key?(:leader), "Expected :leader hook to be registered for Enterprise"
@@ -153,7 +153,7 @@ class SidekiqTest < SpeedshopCloudwatchTest
     reporter = Speedshop::Cloudwatch.reporter
 
     stub_sidekiq_configure_server do
-      Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter)
+      Speedshop::Cloudwatch::Sidekiq.register(reporter: reporter)
     end
 
     assert_equal 0, reporter.collectors.size, "Sidekiq should not be registered yet"
@@ -170,7 +170,7 @@ class SidekiqTest < SpeedshopCloudwatchTest
     reporter = TestDoubles::ReporterDouble.new
 
     stub_sidekiq_configure_server do
-      Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter, process_metrics: true)
+      Speedshop::Cloudwatch::Sidekiq.register(reporter: reporter, process_metrics: true)
       @sidekiq_config_mock.callbacks[:startup].call
 
       collector = reporter.collectors.last
@@ -195,7 +195,7 @@ class SidekiqTest < SpeedshopCloudwatchTest
     reporter = TestDoubles::ReporterDouble.new
 
     stub_sidekiq_configure_server do
-      Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter, process_metrics: false)
+      Speedshop::Cloudwatch::Sidekiq.register(reporter: reporter, process_metrics: false)
       @sidekiq_config_mock.callbacks[:startup].call
 
       collector = reporter.collectors.last
@@ -223,7 +223,7 @@ class SidekiqTest < SpeedshopCloudwatchTest
 
     ::Sidekiq::Stats.stub(:new, -> { raise "boom" }) do
       stub_sidekiq_configure_server do
-        Speedshop::Cloudwatch::Sidekiq.register(namespace: "Sidekiq", reporter: reporter)
+        Speedshop::Cloudwatch::Sidekiq.register(reporter: reporter)
         @sidekiq_config_mock.callbacks[:startup].call
         collector = reporter.collectors.last
         collector[:block].call

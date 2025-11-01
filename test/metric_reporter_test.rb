@@ -6,6 +6,8 @@ class MetricReporterTest < SpeedshopCloudwatchTest
   def setup
     super
     @config = Speedshop::Cloudwatch.config
+    @config.namespaces[:test] = "TestApp"
+    @config.metrics[:test] = [:test_metric, :another_metric, :custom_metric, :metric1, :metric2]
     @reporter = Speedshop::Cloudwatch::MetricReporter.new(config: @config)
   end
 
@@ -15,8 +17,8 @@ class MetricReporterTest < SpeedshopCloudwatchTest
   end
 
   def test_queues_metrics
-    @reporter.report("test_metric", 42, namespace: "TestApp")
-    @reporter.report("another_metric", 100, namespace: "TestApp", unit: "Count")
+    @reporter.report("test_metric", 42, integration: :test)
+    @reporter.report("another_metric", 100, integration: :test, unit: "Count")
   end
 
   def test_can_start_and_stop
@@ -25,7 +27,7 @@ class MetricReporterTest < SpeedshopCloudwatchTest
   end
 
   def test_filters_unregistered_puma_metrics
-    @reporter.report("Workers", 4, namespace: "Puma")
+    @reporter.report("Workers", 4, integration: :puma)
 
     queue = @reporter.queue
     assert_empty queue
@@ -34,8 +36,8 @@ class MetricReporterTest < SpeedshopCloudwatchTest
   def test_respects_puma_metrics_whitelist
     @reporter.register_collector(:puma) {}
     @config.metrics[:puma] = [:Workers]
-    @reporter.report("Workers", 4, namespace: "Puma")
-    @reporter.report("BootedWorkers", 4, namespace: "Puma")
+    @reporter.report("Workers", 4, integration: :puma)
+    @reporter.report("BootedWorkers", 4, integration: :puma)
 
     queue = @reporter.queue
     assert_equal 1, queue.size
@@ -43,7 +45,7 @@ class MetricReporterTest < SpeedshopCloudwatchTest
   end
 
   def test_filters_unregistered_sidekiq_metrics
-    @reporter.report("EnqueuedJobs", 10, namespace: "Sidekiq")
+    @reporter.report("EnqueuedJobs", 10, integration: :sidekiq)
 
     queue = @reporter.queue
     assert_empty queue
@@ -52,9 +54,9 @@ class MetricReporterTest < SpeedshopCloudwatchTest
   def test_respects_sidekiq_metrics_whitelist
     @reporter.register_collector(:sidekiq) {}
     @config.metrics[:sidekiq] = [:EnqueuedJobs, :QueueLatency]
-    @reporter.report("EnqueuedJobs", 10, namespace: "Sidekiq")
-    @reporter.report("ProcessedJobs", 100, namespace: "Sidekiq")
-    @reporter.report("QueueLatency", 5.2, namespace: "Sidekiq")
+    @reporter.report("EnqueuedJobs", 10, integration: :sidekiq)
+    @reporter.report("ProcessedJobs", 100, integration: :sidekiq)
+    @reporter.report("QueueLatency", 5.2, integration: :sidekiq)
 
     queue = @reporter.queue
     assert_equal 2, queue.size
@@ -65,7 +67,10 @@ class MetricReporterTest < SpeedshopCloudwatchTest
   end
 
   def test_allows_unknown_namespaces
-    @reporter.report("custom_metric", 42, namespace: "CustomNamespace")
+    @config.namespaces[:custom] = "CustomNamespace"
+    @config.metrics[:custom] = [:custom_metric]
+    @reporter.register_collector(:custom) {}
+    @reporter.report("custom_metric", 42, integration: :custom)
 
     queue = @reporter.queue
     assert_equal 1, queue.size
@@ -127,7 +132,8 @@ class MetricReporterTest < SpeedshopCloudwatchTest
 
   def test_adds_custom_dimensions_to_metrics
     @config.dimensions = {ServiceName: "myservice-api", Environment: "production"}
-    @reporter.report("test_metric", 42, namespace: "TestApp", dimensions: [{name: "Region", value: "us-east-1"}])
+    @reporter.register_collector(:test) {}
+    @reporter.report("test_metric", 42, integration: :test, dimensions: [{name: "Region", value: "us-east-1"}])
 
     queue = @reporter.queue
     assert_equal 1, queue.size
@@ -147,7 +153,8 @@ class MetricReporterTest < SpeedshopCloudwatchTest
   end
 
   def test_works_without_custom_dimensions
-    @reporter.report("test_metric", 42, namespace: "TestApp", dimensions: [{name: "Region", value: "us-east-1"}])
+    @reporter.register_collector(:test) {}
+    @reporter.report("test_metric", 42, integration: :test, dimensions: [{name: "Region", value: "us-east-1"}])
 
     queue = @reporter.queue
     assert_equal 1, queue.size
@@ -159,7 +166,8 @@ class MetricReporterTest < SpeedshopCloudwatchTest
 
   def test_custom_dimensions_with_no_metric_dimensions
     @config.dimensions = {ServiceName: "myservice-api"}
-    @reporter.report("test_metric", 42, namespace: "TestApp")
+    @reporter.register_collector(:test) {}
+    @reporter.report("test_metric", 42, integration: :test)
 
     queue = @reporter.queue
     assert_equal 1, queue.size
@@ -173,7 +181,7 @@ class MetricReporterTest < SpeedshopCloudwatchTest
     @reporter.register_collector(:test) {}
     refute @reporter.started?
 
-    @reporter.report("test_metric", 42, namespace: "TestApp")
+    @reporter.report("test_metric", 42, integration: :test)
 
     assert @reporter.started?
     assert @reporter.thread.alive?
@@ -183,10 +191,10 @@ class MetricReporterTest < SpeedshopCloudwatchTest
     @reporter.register_collector(:test) {}
     refute @reporter.started?
 
-    @reporter.report("metric1", 1, namespace: "TestApp")
+    @reporter.report("metric1", 1, integration: :test)
     thread1 = @reporter.thread
 
-    @reporter.report("metric2", 2, namespace: "TestApp")
+    @reporter.report("metric2", 2, integration: :test)
     thread2 = @reporter.thread
 
     assert_same thread1, thread2
@@ -194,20 +202,20 @@ class MetricReporterTest < SpeedshopCloudwatchTest
 
   def test_lazy_startup_restarts_after_stop
     @reporter.register_collector(:test) {}
-    @reporter.report("metric1", 1, namespace: "TestApp")
+    @reporter.report("metric1", 1, integration: :test)
     assert @reporter.started?
 
     @reporter.stop!
     refute @reporter.started?
 
-    @reporter.report("metric2", 2, namespace: "TestApp")
+    @reporter.report("metric2", 2, integration: :test)
     assert @reporter.started?
   end
 
   def test_lazy_startup_with_unregistered_integration
     refute @reporter.started?
 
-    @reporter.report("Workers", 4, namespace: "Puma")
+    @reporter.report("Workers", 4, integration: :puma)
 
     refute @reporter.started?
     assert_empty @reporter.queue

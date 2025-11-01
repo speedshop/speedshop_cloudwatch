@@ -6,16 +6,8 @@ module Speedshop
   module Cloudwatch
     module Sidekiq
       class << self
-        def register(namespace: nil, reporter: Speedshop::Cloudwatch.reporter, process_metrics: true)
-          @namespace = namespace || Speedshop::Cloudwatch.config.namespaces[:sidekiq]
+        def register(reporter:, process_metrics: true)
           @reporter = reporter
-          @process_metrics = process_metrics
-          setup_lifecycle_hooks if defined?(::Sidekiq)
-        end
-
-        private
-
-        def setup_lifecycle_hooks
           ::Sidekiq.configure_server do |config|
             # Sidekiq Enterprise has a leader process; OSS does not.
             # Use :leader event for Enterprise to avoid duplicate reporting from all processes.
@@ -23,29 +15,28 @@ module Speedshop
             event = defined?(::Sidekiq::Enterprise) ? :leader : :startup
 
             config.on(event) do
-              @reporter.register_collector(:sidekiq) { collect_metrics }
+              reporter.register_collector(:sidekiq) { collect_metrics(process_metrics: process_metrics) }
             end
 
             config.on(:quiet) do
-              @reporter.unregister_collector(:sidekiq)
-              @reporter.stop!
+              reporter.stop!
             end
 
             config.on(:shutdown) do
-              @reporter.unregister_collector(:sidekiq)
-              @reporter.stop!
+              reporter.stop!
             end
           end
         end
 
-        def collect_metrics
-          return unless defined?(::Sidekiq)
+        private
+
+        def collect_metrics(process_metrics:)
           stats = ::Sidekiq::Stats.new
           processes = ::Sidekiq::ProcessSet.new.to_a
 
           report_stats(stats)
           report_utilization(processes)
-          report_process_metrics(processes) if @process_metrics
+          report_process_metrics(processes) if process_metrics
           report_queue_metrics
         rescue => e
           Speedshop::Cloudwatch.log_error("Failed to collect Sidekiq metrics: #{e.message}", e)
@@ -56,24 +47,24 @@ module Speedshop
             EnqueuedJobs: stats.enqueued, ProcessedJobs: stats.processed, FailedJobs: stats.failed,
             ScheduledJobs: stats.scheduled_size, RetryJobs: stats.retry_size, DeadJobs: stats.dead_size,
             Workers: stats.workers_size, Processes: stats.processes_size
-          }.each { |m, v| @reporter.report(m.to_s, v, namespace: @namespace, unit: "Count") }
-          @reporter.report("DefaultQueueLatency", stats.default_queue_latency, namespace: @namespace, unit: "Seconds")
+          }.each { |m, v| @reporter.report(m.to_s, v, integration: :sidekiq, unit: "Count") }
+          @reporter.report("DefaultQueueLatency", stats.default_queue_latency, integration: :sidekiq, unit: "Seconds")
         end
 
         def report_utilization(processes)
           capacity = processes.sum { |p| p["concurrency"] }
-          @reporter.report("Capacity", capacity, namespace: @namespace, unit: "Count")
+          @reporter.report("Capacity", capacity, integration: :sidekiq, unit: "Count")
 
           utilization = avg_utilization(processes) * 100.0
-          @reporter.report("Utilization", utilization, namespace: @namespace, unit: "Percent") unless utilization.nan?
+          @reporter.report("Utilization", utilization, integration: :sidekiq, unit: "Percent") unless utilization.nan?
 
           processes.group_by { |p| p["tag"] }.each do |tag, procs|
             next unless tag
             dims = [{name: "Tag", value: tag}]
             capacity = procs.sum { |p| p["concurrency"] }
-            @reporter.report("Capacity", capacity, namespace: @namespace, unit: "Count", dimensions: dims)
+            @reporter.report("Capacity", capacity, integration: :sidekiq, unit: "Count", dimensions: dims)
             util = avg_utilization(procs) * 100.0
-            @reporter.report("Utilization", util, namespace: @namespace, unit: "Percent", dimensions: dims) unless util.nan?
+            @reporter.report("Utilization", util, integration: :sidekiq, unit: "Percent", dimensions: dims) unless util.nan?
           end
         end
 
@@ -83,7 +74,7 @@ module Speedshop
             util = p["busy"] / p["concurrency"].to_f * 100.0
             dims = [{name: "Hostname", value: p["hostname"]}]
             dims << {name: "Tag", value: p["tag"]} if p["tag"] && !p["tag"].to_s.empty?
-            @reporter.report("Utilization", util, namespace: @namespace, unit: "Percent", dimensions: dims)
+            @reporter.report("Utilization", util, integration: :sidekiq, unit: "Percent", dimensions: dims)
           end
         end
 
@@ -96,8 +87,8 @@ module Speedshop
           queues = (configured.nil? || configured.empty?) ? all_queues : all_queues.select { |q| configured.include?(q.name) }
           queues.each do |q|
             dims = [{name: "QueueName", value: q.name}]
-            @reporter.report("QueueLatency", q.latency, namespace: @namespace, unit: "Seconds", dimensions: dims)
-            @reporter.report("QueueSize", q.size, namespace: @namespace, unit: "Count", dimensions: dims)
+            @reporter.report("QueueLatency", q.latency, integration: :sidekiq, unit: "Seconds", dimensions: dims)
+            @reporter.report("QueueSize", q.size, integration: :sidekiq, unit: "Count", dimensions: dims)
           end
         end
 

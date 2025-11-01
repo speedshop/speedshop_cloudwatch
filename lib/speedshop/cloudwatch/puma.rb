@@ -4,8 +4,7 @@ module Speedshop
   module Cloudwatch
     module Puma
       class << self
-        def register(namespace: nil, reporter: Speedshop::Cloudwatch.reporter)
-          @namespace = namespace || Speedshop::Cloudwatch.config.namespaces[:puma]
+        def register(reporter: Speedshop::Cloudwatch.reporter)
           @reporter = reporter
           @reporter.register_collector(:puma) { collect_metrics }
         end
@@ -20,7 +19,7 @@ module Speedshop
             %i[workers booted_workers old_workers].each do |m|
               # Submit to SnakeCase tyranny
               metric_name = m.to_s.split("_").map(&:capitalize).join
-              @reporter.report(metric_name, stats[m] || 0, namespace: @namespace, unit: "Count")
+              @reporter.report(metric_name, stats[m] || 0, integration: :puma, unit: "Count")
             end
           end
 
@@ -38,7 +37,7 @@ module Speedshop
           dims = [{name: "WorkerIndex", value: idx.to_s}]
           %i[running backlog pool_capacity max_threads].each do |m|
             metric_name = m.to_s.split("_").map(&:capitalize).join
-            @reporter.report(metric_name, stats[m] || 0, namespace: @namespace, unit: "Count", dimensions: dims)
+            @reporter.report(metric_name, stats[m] || 0, integration: :puma, unit: "Count", dimensions: dims)
           end
         end
       end

@@ -43,14 +43,14 @@ class ActiveJobTest < SpeedshopCloudwatchTest
 
     reported_metric = nil
     reported_value = nil
-    reported_namespace = nil
+    reported_integration = nil
     reported_dimensions = nil
 
     reporter = Speedshop::Cloudwatch.reporter
-    reporter.stub :report, ->(metric, value, namespace:, unit: nil, dimensions: nil) {
+    reporter.stub :report, ->(metric, value, integration:, unit: nil, dimensions: nil) {
       reported_metric = metric
       reported_value = value
-      reported_namespace = namespace
+      reported_integration = integration
       reported_dimensions = dimensions
     } do
       job.perform_now
@@ -58,7 +58,7 @@ class ActiveJobTest < SpeedshopCloudwatchTest
 
     assert_equal "QueueLatency", reported_metric
     assert_operator reported_value, :>=, 2.5
-    assert_equal "ActiveJob", reported_namespace
+    assert_equal :active_job, reported_integration
     assert_equal 2, reported_dimensions.size
     assert_equal "JobClass", reported_dimensions[0][:name]
     assert_equal "TestJob", reported_dimensions[0][:value]
@@ -98,15 +98,15 @@ class ActiveJobTest < SpeedshopCloudwatchTest
     job = TestJob.new("test_arg")
     job.enqueued_at = Time.now.to_f - 1.0
 
-    reported_namespace = nil
+    reported_integration = nil
     reporter = Speedshop::Cloudwatch.reporter
-    reporter.stub :report, ->(metric, value, namespace:, **kwargs) {
-      reported_namespace = namespace
+    reporter.stub :report, ->(metric, value, integration:, **kwargs) {
+      reported_integration = integration
     } do
       job.perform_now
     end
 
-    assert_equal "MyApp/Jobs", reported_namespace
+    assert_equal :active_job, reported_integration
   end
 
   def test_respects_active_job_metrics_whitelist

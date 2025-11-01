@@ -71,12 +71,12 @@ class RackMiddlewareTest < SpeedshopCloudwatchTest
 
     reporter = Speedshop::Cloudwatch.reporter
 
-    reported_namespace = nil
-    reporter.stub :report, ->(metric_name, value, namespace:, **kwargs) { reported_namespace = namespace } do
+    reported_integration = nil
+    reporter.stub :report, ->(metric_name, value, integration:, **kwargs) { reported_integration = integration } do
       call_middleware_with_header("HTTP_X_REQUEST_START")
     end
 
-    assert_equal "MyApp/Rack", reported_namespace
+    assert_equal :rack, reported_integration
   end
 
   def test_logs_error_when_collection_fails
