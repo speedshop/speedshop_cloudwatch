@@ -2,6 +2,7 @@
 
 require "bundler/gem_tasks"
 require "rake/testtask"
+
 require "standard/rake"
 
 FLOG_THRESHOLD = (ENV["FLOG_THRESHOLD"] || 50).to_i

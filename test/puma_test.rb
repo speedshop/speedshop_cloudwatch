@@ -74,7 +74,7 @@ class PumaTest < SpeedshopCloudwatchTest
       assert_includes metric_names, metric
     end
 
-    running_metrics = metrics.select { |m| m[:metric_name] == "Running" }
+    running_metrics = metrics.select { |m| m[:metric_name] == "Running" && m[:dimensions]&.any? { |d| d[:name] == "WorkerIndex" } }
     assert_equal 2, running_metrics.size
   end
 

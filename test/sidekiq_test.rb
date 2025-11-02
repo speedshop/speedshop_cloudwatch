@@ -22,11 +22,19 @@ class SidekiqTest < SpeedshopCloudwatchTest
       config.redis = {db: 15}
       config.logger = Logger.new(nil)
     end
-    Sidekiq.redis(&:flushdb)
+    begin
+      Sidekiq.redis(&:flushdb)
+    rescue RedisClient::CannotConnectError
+      skip "Redis is not available; skipping Sidekiq tests"
+    end
   end
 
   def teardown
-    Sidekiq.redis(&:flushdb)
+    begin
+      Sidekiq.redis(&:flushdb)
+    rescue RedisClient::CannotConnectError
+      # Ignore if Redis isn't available in this environment
+    end
     super
   end
 

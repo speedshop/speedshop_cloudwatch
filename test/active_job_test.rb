@@ -36,8 +36,8 @@ class ActiveJobTest < SpeedshopCloudwatchTest
     reported = reporter.queue.last
     assert_equal "QueueLatency", reported[:metric_name]
     assert_operator reported[:value], :>=, 2.5
-    assert_equal 2, reported[:dimensions].size
-    assert_equal "TestJob", reported[:dimensions].find { |d| d[:name] == "JobClass" }[:value]
+    # Only QueueName is reported to reduce cardinality
+    assert_equal 1, reported[:dimensions].size
     assert_equal "default", reported[:dimensions].find { |d| d[:name] == "QueueName" }[:value]
   end
 
