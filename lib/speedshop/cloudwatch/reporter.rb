@@ -217,16 +217,16 @@ module Speedshop
         minimum = Float::INFINITY
         maximum = -Float::INFINITY
 
-        items.each do |it|
-          if it[:statistic_values]
-            sv = it[:statistic_values]
+        items.each do |item|
+          if item[:statistic_values]
+            sv = item[:statistic_values]
             sc = sv[:sample_count].to_f
             sample_count += sc
             sum += sv[:sum].to_f
             minimum = [minimum, sv[:minimum].to_f].min
             maximum = [maximum, sv[:maximum].to_f].max
-          elsif it.key?(:value)
-            v = it[:value].to_f
+          elsif item.key?(:value)
+            v = item[:value].to_f
             sample_count += 1.0
             sum += v
             minimum = [minimum, v].min

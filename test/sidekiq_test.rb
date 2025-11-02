@@ -8,6 +8,7 @@ require "connection_pool"
 class SidekiqTest < SpeedshopCloudwatchTest
   class TestJob
     include Sidekiq::Job
+
     def perform
     end
   end
