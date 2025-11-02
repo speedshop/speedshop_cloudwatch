@@ -149,11 +149,11 @@ GEM
     net-smtp (0.5.1)
       net-protocol
     nio4r (2.7.5)
-    nokogiri (1.18.10-aarch64-linux)
+    nokogiri (1.18.10-aarch64-linux-gnu)
       racc (~> 1.4)
     nokogiri (1.18.10-aarch64-linux-musl)
       racc (~> 1.4)
-    nokogiri (1.18.10-arm-linux)
+    nokogiri (1.18.10-arm-linux-gnu)
       racc (~> 1.4)
     nokogiri (1.18.10-arm-linux-musl)
       racc (~> 1.4)
@@ -161,7 +161,7 @@ GEM
       racc (~> 1.4)
     nokogiri (1.18.10-x86_64-darwin)
       racc (~> 1.4)
-    nokogiri (1.18.10-x86_64-linux)
+    nokogiri (1.18.10-x86_64-linux-gnu)
       racc (~> 1.4)
     nokogiri (1.18.10-x86_64-linux-musl)
       racc (~> 1.4)
@@ -290,13 +290,13 @@ GEM
     zeitwerk (2.7.3)
 
 PLATFORMS
-  aarch64-linux
+  aarch64-linux-gnu
   aarch64-linux-musl
-  arm-linux
+  arm-linux-gnu
   arm-linux-musl
   arm64-darwin
   x86_64-darwin
-  x86_64-linux
+  x86_64-linux-gnu
   x86_64-linux-musl
 
 DEPENDENCIES
@@ -312,4 +312,4 @@ DEPENDENCIES
   webmock
 
 BUNDLED WITH
-   2.4.12
+   2.7.0
