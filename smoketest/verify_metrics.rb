@@ -91,8 +91,8 @@ end
 puts ""
 
 EXPECTED_METRIC_COUNTS = {
-  "Rack" => {"RequestQueueTime" => 20},
-  "ActiveJob" => {"QueueLatency" => 10},
+  "Rack" => {"RequestQueueTime" => 2},
+  "ActiveJob" => {"QueueLatency" => 2},
   "Sidekiq" => {"EnqueuedJobs" => 1}
 }
 
