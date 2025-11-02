@@ -168,7 +168,7 @@ We report the following metrics:
 QueueLatency - Time job spent waiting in queue before execution (Seconds)
 ```
 
-This metric includes JobClass and QueueName dimensions.
+This metric includes QueueName dimension and is aggregated per interval using CloudWatch StatisticSets.
 
 ### Rails
 
@@ -218,3 +218,9 @@ If for some reason you want to disable an integration _after_ this registration,
 ```ruby
 
 ```
+
+## Comparisons and Design Notes
+
+For a deep comparison with related libraries and concrete recommendations informed by their approaches, see:
+
+- docs/cloudwatch_libs_comparison.md

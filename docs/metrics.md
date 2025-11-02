@@ -132,6 +132,6 @@ This document explains each metric collected by Speedshop::Cloudwatch, how it's 
 
 ### QueueLatency
 - **Unit:** Seconds
-- **Dimensions:** JobClass, QueueName
+- **Dimensions:** QueueName
 - **Source:** `Time.now.to_f - job.enqueued_at`
-- **Description:** Time a job spent waiting in the queue before execution started. Measured when the job begins executing. High latency indicates jobs are backing up for this job class and queue combination.
+- **Description:** Time a job spent waiting in the queue before execution started. Measured when the job begins executing. Values are aggregated per queue into CloudWatch StatisticSets for each reporting interval.

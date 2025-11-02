@@ -54,7 +54,7 @@ module Speedshop
         thread_to_join&.join
       end
 
-      def report(metric:, value:, dimensions: {}, namespace: nil, integration: nil)
+      def report(metric:, value: nil, statistic_values: nil, dimensions: {}, namespace: nil, integration: nil)
         metric_name = metric.to_sym
 
         int = integration || find_integration_for_metric(metric_name)
@@ -68,10 +68,15 @@ module Speedshop
         dimensions_array = dimensions.map { |k, v| {name: k.to_s, value: v.to_s} }
         all_dimensions = dimensions_array + custom_dimensions
 
-        @mutex.synchronize do
-          @queue << {metric_name: metric_name.to_s, value: value, namespace: ns, unit: unit,
-                     dimensions: all_dimensions, timestamp: Time.now}
+        datum = {metric_name: metric_name.to_s, namespace: ns, unit: unit,
+                 dimensions: all_dimensions, timestamp: Time.now}
+        if statistic_values
+          datum[:statistic_values] = statistic_values
+        else
+          datum[:value] = value
         end
+
+        @mutex.synchronize { @queue << datum }
 
         start! unless started?
       end
@@ -137,13 +142,97 @@ module Speedshop
         metrics = @mutex.synchronize { @queue.empty? ? nil : @queue.dup.tap { @queue.clear } }
         return unless metrics
 
+        high_resolution = config.interval.to_i < 60
+
         metrics.group_by { |m| m[:namespace] }.each do |namespace, ns_metrics|
           config.logger.debug "Speedshop::Cloudwatch: Sending #{ns_metrics.size} metrics to namespace #{namespace}"
-          metric_data = ns_metrics.map { |m| m.slice(:metric_name, :value, :unit, :timestamp, :dimensions) }
-          config.client.put_metric_data(namespace: namespace, metric_data: metric_data)
+
+          aggregated = aggregate_namespace_metrics(ns_metrics)
+
+          metric_data = aggregated.map do |m|
+            datum = {
+              metric_name: m[:metric_name],
+              unit: m[:unit],
+              timestamp: m[:timestamp],
+              dimensions: m[:dimensions]
+            }
+            if m[:statistic_values]
+              datum[:statistic_values] = m[:statistic_values]
+            else
+              datum[:value] = m[:value]
+            end
+            datum[:storage_resolution] = 1 if high_resolution
+            datum
+          end
+
+          metric_data.each_slice(20) do |batch|
+            config.client.put_metric_data(namespace: namespace, metric_data: batch)
+          end
         end
       rescue => e
         Speedshop::Cloudwatch.log_error("Failed to send metrics: #{e.message}", e)
+      end
+
+      def aggregate_namespace_metrics(ns_metrics)
+        # Group by metric_name + unit + dimensions (order-insensitive) to aggregate within a flush window.
+        groups = {}
+
+        ns_metrics.each do |m|
+          key = [m[:metric_name], m[:unit], normalized_dimensions_key(m[:dimensions])]
+          (groups[key] ||= []) << m
+        end
+
+        aggregated = []
+        groups.each do |(_name, _unit, _dims_key), items|
+          # If only one item and it already has value/statistic_values, keep as-is
+          if items.size == 1
+            aggregated << items.first
+            next
+          end
+
+          # Aggregate values and statistic_values into a single StatisticSet
+          sample_count = 0.0
+          sum = 0.0
+          minimum = Float::INFINITY
+          maximum = -Float::INFINITY
+
+          items.each do |it|
+            if it[:statistic_values]
+              sv = it[:statistic_values]
+              sc = sv[:sample_count].to_f
+              sample_count += sc
+              sum += sv[:sum].to_f
+              minimum = [minimum, sv[:minimum].to_f].min
+              maximum = [maximum, sv[:maximum].to_f].max
+            elsif it.key?(:value)
+              v = it[:value].to_f
+              sample_count += 1.0
+              sum += v
+              minimum = [minimum, v].min
+              maximum = [maximum, v].max
+            end
+          end
+
+          aggregated << {
+            metric_name: items.first[:metric_name],
+            unit: items.first[:unit],
+            dimensions: items.first[:dimensions],
+            # Use flush time to represent the interval
+            timestamp: Time.now,
+            statistic_values: {
+              sample_count: sample_count,
+              sum: sum,
+              minimum: minimum.finite? ? minimum : 0.0,
+              maximum: maximum.finite? ? maximum : 0.0
+            }
+          }
+        end
+
+        aggregated
+      end
+
+      def normalized_dimensions_key(dims)
+        (dims || []).sort_by { |d| d[:name].to_s }.map { |d| "#{d[:name]}=#{d[:value]}" }.join("|")
       end
 
       def metric_allowed?(integration, metric_name)
