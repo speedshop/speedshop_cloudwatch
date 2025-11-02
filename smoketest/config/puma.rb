@@ -11,4 +11,7 @@ pidfile ENV.fetch("PIDFILE", "tmp/pids/server.pid")
 workers ENV.fetch("WEB_CONCURRENCY", 2)
 preload_app!
 
-# No manual registration needed - Puma integration auto-registers on require
+Speedshop::Cloudwatch.configure do |config|
+  config.collectors << :puma
+end
+Speedshop::Cloudwatch.start!

@@ -95,7 +95,7 @@ bundle exec rake db:test_metric_report
 echo "✓ Rake task completed"
 echo ""
 
-for i in {1..9}; do
+for i in {1..6}; do
   sleep 10
   echo -n "."
 done

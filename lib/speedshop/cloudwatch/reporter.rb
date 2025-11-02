@@ -14,25 +14,20 @@ module Speedshop
         @mutex = Mutex.new
         @queue = []
         @collectors = []
-        @thread = @pid = nil
+        @thread = nil
+        @pid = Process.pid
         @running = false
-        @on_demand_integrations = Set.new
       end
 
       def start!
         return if started?
-        return if skip_start?
 
         @mutex.synchronize do
           return if started?
 
-          config = Config.instance
-          raise ArgumentError, "CloudWatch client must be provided" unless config.client
+          initialize_collectors unless forked? # We only put collectors in the master
 
-          initialize_collectors
-          return Speedshop::Cloudwatch.log_info("No integrations enabled, not starting reporter") if @collectors.empty?
-
-          Speedshop::Cloudwatch.log_info("Starting metric reporter (interval: #{config.interval}s)")
+          Speedshop::Cloudwatch.log_info("Starting metric reporter (collectors: #{@collectors.map(&:class).join(", ")})")
           @pid = Process.pid
           @running = true
           @thread = Thread.new do
@@ -43,7 +38,7 @@ module Speedshop
       end
 
       def started?
-        @running && @pid == Process.pid && @thread&.alive?
+        @running && !forked? && @thread&.alive?
       end
 
       def stop!
@@ -59,21 +54,16 @@ module Speedshop
         thread_to_join&.join
       end
 
-      def report(metric:, value:, dimensions: {}, namespace: nil)
-        config = Config.instance
+      def report(metric:, value:, dimensions: {}, namespace: nil, integration: nil)
         metric_name = metric.to_sym
 
-        integration = find_integration_for_metric(metric_name)
-        return unless integration
+        int = integration || find_integration_for_metric(metric_name)
+        return unless int
 
-        ns = namespace || config.namespaces[integration]
+        ns = namespace || config.namespaces[int]
         unit = config.units[metric_name] || "None"
 
-        if [:rack, :active_job].include?(integration)
-          @mutex.synchronize { @on_demand_integrations << integration }
-        end
-
-        return unless metric_allowed?(integration, metric_name)
+        return unless metric_allowed?(int, metric_name)
 
         dimensions_array = dimensions.map { |k, v| {name: k.to_s, value: v.to_s} }
         all_dimensions = dimensions_array + custom_dimensions
@@ -90,12 +80,7 @@ module Speedshop
         @mutex.synchronize do
           @queue.clear
           @collectors.clear
-          @on_demand_integrations.clear
         end
-      end
-
-      def enable_integration(integration)
-        @mutex.synchronize { @on_demand_integrations << integration }
       end
 
       def self.reset
@@ -109,29 +94,16 @@ module Speedshop
 
       private
 
-      def skip_start?
-        if defined?(Rails::Console)
-          Speedshop::Cloudwatch.log_info("Skipping reporter start in Rails console")
-          return true
-        end
+      def config
+        Config.instance
+      end
 
-        if defined?(Rails::Command::RunnerCommand)
-          Speedshop::Cloudwatch.log_info("Skipping reporter start in Rails runner")
-          return true
-        end
-
-        if defined?(Rake) && defined?(Rake.application) && Rake.respond_to?(:application) &&
-            Rake.application.top_level_tasks.any? { |t| t.match?(/^(assets:|db:|webpacker:)/) }
-          Speedshop::Cloudwatch.log_info("Skipping reporter start in Rake task")
-          return true
-        end
-
-        false
+      def forked?
+        @pid != Process.pid
       end
 
       def initialize_collectors
-        Integration.integrations.each do |integration|
-          next unless integration.collector_class.collect?(Config.instance)
+        config.collectors.each do |integration|
           @collectors << integration.collector_class.new
         rescue => e
           Speedshop::Cloudwatch.log_error("Failed to initialize collector for #{integration.name}: #{e.message}", e)
@@ -139,7 +111,6 @@ module Speedshop
       end
 
       def run_loop
-        config = Config.instance
         while @running
           (config.interval / 0.1).to_i.times do
             break unless @running
@@ -162,7 +133,6 @@ module Speedshop
       end
 
       def flush_metrics
-        config = Config.instance
         metrics = @mutex.synchronize { @queue.empty? ? nil : @queue.dup.tap { @queue.clear } }
         return unless metrics
 
@@ -176,20 +146,16 @@ module Speedshop
       end
 
       def metric_allowed?(integration, metric_name)
-        config = Config.instance
-        (@collectors.any? || @on_demand_integrations.include?(integration)) &&
-          config.metrics[integration].include?(metric_name.to_sym)
+        config.metrics[integration].include?(metric_name.to_sym)
       end
 
       def custom_dimensions
-        Config.instance.dimensions.map { |name, value| {name: name.to_s, value: value.to_s} }
+        config.dimensions.map { |name, value| {name: name.to_s, value: value.to_s} }
       end
 
       def find_integration_for_metric(metric_name)
-        Config.instance.metrics.find { |int, metrics| metrics.include?(metric_name.to_sym) }&.first
+        config.metrics.find { |int, metrics| metrics.include?(metric_name.to_sym) }&.first
       end
     end
-
-    MetricReporter = Reporter
   end
 end

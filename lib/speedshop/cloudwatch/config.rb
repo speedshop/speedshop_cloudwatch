@@ -8,7 +8,7 @@ module Speedshop
     class Config
       include Singleton
 
-      attr_accessor :interval, :metrics, :namespaces, :logger, :sidekiq_queues, :dimensions, :units
+      attr_accessor :interval, :metrics, :namespaces, :logger, :sidekiq_queues, :dimensions, :units, :collectors
       attr_writer :client
 
       def initialize
@@ -45,7 +45,7 @@ module Speedshop
         @sidekiq_queues = nil
         @dimensions = {}
         @logger = (defined?(Rails) && Rails.respond_to?(:logger) && Rails.logger) ? Rails.logger : Logger.new($stdout)
-        @integration_configs = []
+        @collectors = [] # [:puma, :sidekiq]
       end
 
       def self.reset
@@ -55,17 +55,6 @@ module Speedshop
         end
         instance_variable_set(:@singleton__instance__, nil)
       end
-
-      def expose_integration_config(name, config_obj)
-        return if @integration_configs.any? { |c| c == config_obj }
-        @integration_configs << config_obj
-
-        singleton_class.define_method(name) do
-          config_obj
-        end
-      end
     end
-
-    Configuration = Config
   end
 end

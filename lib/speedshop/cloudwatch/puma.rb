@@ -3,11 +3,7 @@
 module Speedshop
   module Cloudwatch
     module Puma
-      class MetricsCollector < Speedshop::Cloudwatch::MetricsCollector
-        def self.collect?(config)
-          defined?(::Puma)
-        end
-
+      class Collector
         def collect
           stats = ::Puma.stats_hash
 
@@ -41,4 +37,3 @@ module Speedshop
   end
 end
 
-Speedshop::Cloudwatch::Integration.add_integration(:puma, Speedshop::Cloudwatch::Puma::MetricsCollector)

@@ -172,10 +172,11 @@ This metric includes JobClass and QueueName dimensions.
 
 ### Rails
 
-We do two things when we're running in a Rails app:
+We do three things when we're running in a Rails app:
 
 1. Automatically insert a Rack middleware at index 0.
 2. Disable metric collection if running in Rake or a console.
+3. Run `Speedshop::Cloudwatch.reporter.start!` to start the reporting loop.
 
 If you want full control over these behaviors, add `require: false` to your Gemfile:
 
@@ -192,8 +193,16 @@ require 'speedshop/cloudwatch'
 # Insert middleware manually (if using Rack integration)
 Rails.application.config.middleware.insert_before 0, Speedshop::Cloudwatch::RackMiddleware
 
-# At this point, the auto-disable behavior in Rake is disabled. You'll have to re-implement yourself.
+Rails.application.configure do
+  config.after_initialize do
+    Speedshop::Cloudwatch.reporter.start!
+  end
+end
 ```
+
+### Non-Rails Apps
+
+
 
 ### Disabling Integrations
 

@@ -5,15 +5,9 @@ require "sidekiq/api"
 module Speedshop
   module Cloudwatch
     module Sidekiq
-      class MetricsCollector < Speedshop::Cloudwatch::MetricsCollector
-        def self.collect?(config)
-          defined?(::Sidekiq) && defined?(::Sidekiq::VERSION)
-        end
-
-        def initialize(config: Config.instance)
-          super
+      class Collector
+        def initialize
           @process_metrics = true
-          setup_lifecycle_hooks
         end
 
         def collect
@@ -28,22 +22,39 @@ module Speedshop
           Speedshop::Cloudwatch.log_error("Failed to collect Sidekiq metrics: #{e.message}", e)
         end
 
-        private
-
-        def setup_lifecycle_hooks
+        def self.setup_lifecycle_hooks
+          puts "setup lifecycle hooks"
           ::Sidekiq.configure_server do |sidekiq_config|
+            if defined?(Sidekiq::Enterprise)
+              sidekiq_config.on(:leader) do
+                Speedshop::Cloudwatch.configure { |c| c.collectors << :sidekiq }
+                Speedshop::Cloudwatch.start!
+              end
+            else
+              sidekiq_config.on(:startup) do
+                puts "startup hook"
+                Speedshop::Cloudwatch.configure { |c| c.collectors << :sidekiq }
+                Speedshop::Cloudwatch.start!
+              end
+            end
+
             sidekiq_config.on(:quiet) do
-              Reporter.instance.stop!
+              Speedshop::Cloudwatch.stop!
             end
 
             sidekiq_config.on(:shutdown) do
-              Reporter.instance.stop!
+              Speedshop::Cloudwatch.stop!
             end
           end
         end
 
+        private
+
+        def reporter
+          Speedshop::Cloudwatch.reporter
+        end
+
         def report_stats(stats)
-          reporter = Reporter.instance
           {
             EnqueuedJobs: stats.enqueued, ProcessedJobs: stats.processed, FailedJobs: stats.failed,
             ScheduledJobs: stats.scheduled_size, RetryJobs: stats.retry_size, DeadJobs: stats.dead_size,
@@ -53,7 +64,6 @@ module Speedshop
         end
 
         def report_utilization(processes)
-          reporter = Reporter.instance
           capacity = processes.sum { |p| p["concurrency"] }
           reporter.report(metric: :Capacity, value: capacity)
 
@@ -70,7 +80,6 @@ module Speedshop
         end
 
         def report_process_metrics(processes)
-          reporter = Reporter.instance
           processes.each do |p|
             next if p["concurrency"].zero?
             util = p["busy"] / p["concurrency"].to_f * 100.0
@@ -81,8 +90,7 @@ module Speedshop
         end
 
         def report_queue_metrics
-          reporter = Reporter.instance
-          configured = config.sidekiq_queues
+          configured = Speedshop::Cloudwatch.config.sidekiq_queues
           all_queues = ::Sidekiq::Queue.all
           queues = (configured.nil? || configured.empty?) ? all_queues : all_queues.select { |q| configured.include?(q.name) }
           queues.each do |q|
@@ -100,4 +108,4 @@ module Speedshop
   end
 end
 
-Speedshop::Cloudwatch::Integration.add_integration(:sidekiq, Speedshop::Cloudwatch::Sidekiq::MetricsCollector)
+Speedshop::Cloudwatch::Sidekiq::Collector.setup_lifecycle_hooks

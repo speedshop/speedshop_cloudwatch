@@ -38,13 +38,11 @@ class PumaTest < SpeedshopCloudwatchTest
   private
 
   def run_puma_collector_with_stats(stats)
-    reporter = Speedshop::Cloudwatch::Reporter.instance
-    reporter.enable_integration(:puma)
     ::Puma.stub(:stats_hash, stats) do
-      collector = Speedshop::Cloudwatch::Puma::MetricsCollector.new
+      collector = Speedshop::Cloudwatch::Puma::Collector.new
       collector.collect
     end
-    reporter.queue.dup
+    Speedshop::Cloudwatch.reporter.queue.dup
   end
 
   def collect_clustered_puma_metrics

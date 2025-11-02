@@ -1,10 +1,8 @@
 # frozen_string_literal: true
 
 require "aws-sdk-cloudwatch"
-require "speedshop/cloudwatch/configuration"
-require "speedshop/cloudwatch/integration"
-require "speedshop/cloudwatch/metrics_collector"
-require "speedshop/cloudwatch/metric_reporter"
+require "speedshop/cloudwatch/config"
+require "speedshop/cloudwatch/reporter"
 require "speedshop/cloudwatch/active_job"
 require "speedshop/cloudwatch/puma"
 require "speedshop/cloudwatch/rack_middleware"
@@ -29,8 +27,8 @@ module Speedshop
         Reporter.instance
       end
 
-      def add_integration(name, collector_class, config: nil)
-        Integration.add_integration(name, collector_class, config: config)
+      def start!
+        reporter.start!
       end
 
       def log_info(msg)

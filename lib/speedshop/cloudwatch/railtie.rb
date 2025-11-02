@@ -9,10 +9,6 @@ module Speedshop
         end
       end
 
-      config.after_initialize do
-        Reporter.instance.start!
-      end
-
       def self.in_rake_task?
         return false unless defined?(::Rake) && ::Rake.respond_to?(:application)
         tasks = ::Rake.application.top_level_tasks || []

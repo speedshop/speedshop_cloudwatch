@@ -55,9 +55,8 @@ class SidekiqTest < SpeedshopCloudwatchTest
   end
 
   def test_collects_all_metrics_with_real_sidekiq_data
-    reporter = Speedshop::Cloudwatch::Reporter.instance
-    reporter.enable_integration(:sidekiq)
-    collector = Speedshop::Cloudwatch::Sidekiq::MetricsCollector.new
+    reporter = Speedshop::Cloudwatch.reporter
+    collector = Speedshop::Cloudwatch::Sidekiq::Collector.new
     collector.collect
 
     metric_names = reporter.queue.map { |m| m[:metric_name] }
@@ -81,7 +80,7 @@ class SidekiqTest < SpeedshopCloudwatchTest
     end
 
     ::Sidekiq::Stats.stub(:new, -> { raise "boom" }) do
-      collector = Speedshop::Cloudwatch::Sidekiq::MetricsCollector.new
+      collector = Speedshop::Cloudwatch::Sidekiq::Collector.new
       collector.collect
     end
 
@@ -97,9 +96,8 @@ class SidekiqTest < SpeedshopCloudwatchTest
   end
 
   def collect_sidekiq_queue_names
-    reporter = Speedshop::Cloudwatch::Reporter.instance
-    reporter.enable_integration(:sidekiq)
-    collector = Speedshop::Cloudwatch::Sidekiq::MetricsCollector.new
+    reporter = Speedshop::Cloudwatch.reporter
+    collector = Speedshop::Cloudwatch::Sidekiq::Collector.new
     collector.collect
 
     queue_metrics = reporter.queue.select do |m|

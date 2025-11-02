@@ -2,7 +2,7 @@ require "json"
 require "cgi"
 require_relative "../lib/speedshop/cloudwatch/configuration"
 
-config = Speedshop::Cloudwatch::Configuration.instance
+config = Speedshop::Cloudwatch::Config.instance
 
 EXPECTED_METRICS = config.metrics.transform_keys { |integration|
   config.namespaces[integration]
