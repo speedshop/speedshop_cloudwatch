@@ -4,6 +4,8 @@ This document explains each metric collected by Speedshop::Cloudwatch, how it's 
 
 ## Puma Metrics
 
+Note: In cluster mode, in addition to the per-worker metrics below, the library also reports aggregate StatisticSets across all workers for Running, Backlog, PoolCapacity, and MaxThreads (without the WorkerIndex dimension). This enables min/max/avg across the cluster per reporting interval.
+
 ### Workers
 - **Unit:** Count
 - **Source:** `Puma.stats_hash[:workers]`
