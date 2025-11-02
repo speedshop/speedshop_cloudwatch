@@ -84,15 +84,6 @@ class ReporterTest < SpeedshopCloudwatchTest
     assert_same thread1, thread2
   end
 
-  def test_started_detects_pid_change
-    @reporter.start!
-    original_pid = @reporter.pid
-
-    @reporter.pid = original_pid + 1
-
-    refute @reporter.started?
-  end
-
   def test_started_detects_dead_thread
     @reporter.start!
     @reporter.thread.kill

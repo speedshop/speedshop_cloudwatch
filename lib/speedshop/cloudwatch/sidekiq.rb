@@ -23,7 +23,6 @@ module Speedshop
         end
 
         def self.setup_lifecycle_hooks
-          puts "setup lifecycle hooks"
           ::Sidekiq.configure_server do |sidekiq_config|
             if defined?(Sidekiq::Enterprise)
               sidekiq_config.on(:leader) do
@@ -32,7 +31,6 @@ module Speedshop
               end
             else
               sidekiq_config.on(:startup) do
-                puts "startup hook"
                 Speedshop::Cloudwatch.configure { |c| c.collectors << :sidekiq }
                 Speedshop::Cloudwatch.start!
               end
@@ -58,9 +56,9 @@ module Speedshop
           {
             EnqueuedJobs: stats.enqueued, ProcessedJobs: stats.processed, FailedJobs: stats.failed,
             ScheduledJobs: stats.scheduled_size, RetryJobs: stats.retry_size, DeadJobs: stats.dead_size,
-            Workers: stats.workers_size, Processes: stats.processes_size
-          }.each { |m, v| reporter.report(metric: m, value: v) }
-          reporter.report(metric: :DefaultQueueLatency, value: stats.default_queue_latency)
+            Workers: stats.workers_size, Processes: stats.processes_size,
+            DefaultQueueLatency: stats.default_queue_latency
+          }.each { |m, v| reporter.report(metric: m, value: v, integration: :sidekiq) }
         end
 
         def report_utilization(processes)

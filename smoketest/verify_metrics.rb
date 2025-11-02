@@ -1,6 +1,6 @@
 require "json"
 require "cgi"
-require_relative "../lib/speedshop/cloudwatch/configuration"
+require_relative "../lib/speedshop/cloudwatch/config"
 
 config = Speedshop::Cloudwatch::Config.instance
 
@@ -34,6 +34,7 @@ puts "📊 Analyzing #{captured_data.length} CloudWatch API calls..."
 puts ""
 
 captured_metrics = Hash.new { |h, k| h[k] = [] }
+metric_counts = Hash.new { |h, k| h[k] = Hash.new(0) }
 
 captured_data.each do |request|
   params = CGI.parse(request["body"])
@@ -45,6 +46,7 @@ captured_data.each do |request|
     metric_name = params[key].first
     namespace_key = namespace.split("/").last
     captured_metrics[namespace_key] << metric_name unless captured_metrics[namespace_key].include?(metric_name)
+    metric_counts[namespace_key][metric_name] += 1
   end
 end
 
@@ -88,6 +90,31 @@ FORBIDDEN_METRICS.each do |integration, forbidden|
 end
 puts ""
 
+EXPECTED_METRIC_COUNTS = {
+  "Rack" => {"RequestQueueTime" => 20},
+  "ActiveJob" => {"QueueLatency" => 10},
+  "Sidekiq" => {"EnqueuedJobs" => 1}
+}
+
+puts "Checking metric counts (based on generated traffic):"
+puts ""
+
+count_failures = []
+EXPECTED_METRIC_COUNTS.each do |integration, expected_counts|
+  puts "#{integration}:"
+  expected_counts.each do |metric, expected_count|
+    actual_count = metric_counts[integration][metric]
+    if actual_count >= expected_count
+      puts "  ✓ #{metric}: #{actual_count} (expected >= #{expected_count})"
+    else
+      puts "  ❌ #{metric}: #{actual_count} (expected >= #{expected_count})"
+      count_failures << "#{integration}/#{metric}: got #{actual_count}, expected >= #{expected_count}"
+      all_passed = false
+    end
+  end
+  puts ""
+end
+
 puts "Summary:"
 puts "  Total API calls: #{captured_data.length}"
 puts "  Total unique metrics: #{captured_metrics.values.flatten.uniq.length}"
@@ -98,6 +125,7 @@ puts ""
 if all_passed
   puts "✅ All expected metrics were captured!"
   puts "✅ No forbidden metrics were captured!"
+  puts "✅ All metric counts met expectations!"
   exit 0
 else
   if missing_metrics.any?
@@ -107,6 +135,10 @@ else
   if forbidden_found.any?
     puts "❌ Found #{forbidden_found.length} forbidden metrics:"
     forbidden_found.each { |m| puts "   - #{m}" }
+  end
+  if count_failures.any?
+    puts "❌ #{count_failures.length} metric count assertions failed:"
+    count_failures.each { |f| puts "   - #{f}" }
   end
   exit 1
 end

@@ -25,10 +25,10 @@ module Speedshop
         @mutex.synchronize do
           return if started?
 
-          initialize_collectors unless forked? # We only put collectors in the master
+          initialize_collectors
+          @collectors.clear if forked? # We only collect in the master process
 
           Speedshop::Cloudwatch.log_info("Starting metric reporter (collectors: #{@collectors.map(&:class).join(", ")})")
-          @pid = Process.pid
           @running = true
           @thread = Thread.new do
             Thread.current.thread_variable_set(:fork_safe, true)
@@ -38,7 +38,7 @@ module Speedshop
       end
 
       def started?
-        @running && !forked? && @thread&.alive?
+        @running && @thread&.alive?
       end
 
       def stop!
@@ -104,7 +104,8 @@ module Speedshop
 
       def initialize_collectors
         config.collectors.each do |integration|
-          @collectors << integration.collector_class.new
+          @collectors << Speedshop::Cloudwatch::Puma::Collector.new if integration == :puma
+          @collectors << Speedshop::Cloudwatch::Sidekiq::Collector.new if integration == :sidekiq
         rescue => e
           Speedshop::Cloudwatch.log_error("Failed to initialize collector for #{integration.name}: #{e.message}", e)
         end

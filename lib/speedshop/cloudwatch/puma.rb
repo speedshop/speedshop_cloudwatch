@@ -36,4 +36,3 @@ module Speedshop
     end
   end
 end
-
