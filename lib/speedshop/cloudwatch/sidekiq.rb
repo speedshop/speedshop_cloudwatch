@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "sidekiq/api"
+require "speedshop/cloudwatch/core"
 
 module Speedshop
   module Cloudwatch

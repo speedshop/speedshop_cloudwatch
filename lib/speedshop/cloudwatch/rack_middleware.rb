@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "speedshop/cloudwatch/core"
+
 module Speedshop
   module Cloudwatch
     class RackMiddleware

@@ -35,8 +35,26 @@ This gem is for **infrastructure and queue metrics**, not application performanc
 
 ## Installation
 
+Add to your Gemfile:
+
 ```ruby
-gem 'speedshop-cloudwatch'
+gem 'speedshop-cloudwatch', require: false
+```
+
+**Important:** Use `require: false` and explicitly require only the integrations you need. This gives you full control over which integrations are loaded.
+
+Then require the integrations you need:
+
+```ruby
+# Option 1: Load all integrations (simplest, good for getting started)
+require 'speedshop/cloudwatch/all'
+
+# Option 2: Load only specific integrations (recommended for production)
+require 'speedshop/cloudwatch/core'
+require 'speedshop/cloudwatch/puma'    # if using Puma
+require 'speedshop/cloudwatch/sidekiq' # if using Sidekiq
+require 'speedshop/cloudwatch/rack'    # if using Rack middleware
+# require 'speedshop/cloudwatch/active_job' # if using ActiveJob (not with Sidekiq)
 ```
 
 See each integration below for instructions on how to setup and configure that integration.
@@ -79,6 +97,8 @@ Add to your `config/puma.rb`:
 
 ```ruby
 require_relative "../config/environment"
+require 'speedshop/cloudwatch/core'
+require 'speedshop/cloudwatch/puma'
 
 Speedshop::Cloudwatch.configure do |config|
   config.collectors << :puma
@@ -120,7 +140,14 @@ RequestQueueTime - Time spent waiting in the request queue (Milliseconds)
 
 ### Sidekiq Integration
 
-In Sidekiq server processes, this integration auto-registers lifecycle hooks. On startup, it adds the `:sidekiq` collector and starts the reporter (leader-only when using Sidekiq Enterprise).
+Require the Sidekiq integration in your initializer or where Sidekiq is configured:
+
+```ruby
+require 'speedshop/cloudwatch/core'
+require 'speedshop/cloudwatch/sidekiq'
+```
+
+This integration auto-registers lifecycle hooks. On startup (in server processes only), it adds the `:sidekiq` collector and starts the reporter (leader-only when using Sidekiq Enterprise).
 
 If you're using Sidekiq as your ActiveJob adapter, prefer this integration instead of the ActiveJob integration.
 
@@ -149,7 +176,14 @@ Capacity and Utilization metrics may include Tag and/or Hostname dimensions.
 
 **Note: if you're using Sidekiq, just use that integration and do not include the ActiveJob module.**
 
-In your ApplicationJob:
+First, require the ActiveJob integration:
+
+```ruby
+require 'speedshop/cloudwatch/core'
+require 'speedshop/cloudwatch/active_job'
+```
+
+Then in your ApplicationJob:
 
 ```ruby
 include Speedshop::Cloudwatch::ActiveJob
@@ -165,30 +199,44 @@ This metric includes QueueName dimension and is aggregated per interval using Cl
 
 ### Rails
 
-When running in a Rails app we:
+**Automatic behavior (requires `speedshop/cloudwatch/all`):**
 
-1. Automatically insert the Rack middleware at index 0 (skipped for console, runner, and common `assets:`/`db:` rake tasks).
-2. Respect your configuration for enabled metrics and collectors. The reporter starts automatically the first time a metric is reported (e.g., via Rack middleware) or when you call `Speedshop::Cloudwatch.start!` yourself (e.g., in Puma or initializers).
-
-If you want full control over these behaviors, add `require: false` to your Gemfile:
+If you require `speedshop/cloudwatch/all`, the Railtie will automatically insert the Rack middleware at index 0 (skipped for console, runner, and common `assets:`/`db:` rake tasks).
 
 ```ruby
+# Gemfile
 gem 'speedshop-cloudwatch', require: false
+
+# config/initializers/speedshop_cloudwatch.rb
+require 'speedshop/cloudwatch/all'
+
+Speedshop::Cloudwatch.configure do |config|
+  # your config here
+end
 ```
 
-Then manually require the core module without the railtie:
+**Manual control (recommended for production):**
+
+For fine-grained control, require only the integrations you need and configure them explicitly:
 
 ```ruby
-# config/initializers/speedshop-cloudwatch.rb
-require 'speedshop/cloudwatch'
+# Gemfile
+gem 'speedshop-cloudwatch', require: false
 
-# Insert middleware manually (if using Rack integration)
+# config/initializers/speedshop_cloudwatch.rb
+require 'speedshop/cloudwatch/core'
+require 'speedshop/cloudwatch/rack'    # loads middleware class but doesn't auto-insert
+
+# Insert middleware manually
 Rails.application.config.middleware.insert_before 0, Speedshop::Cloudwatch::RackMiddleware
 
-Rails.application.configure do
-  config.after_initialize do
-    Speedshop::Cloudwatch.start!
-  end
+Speedshop::Cloudwatch.configure do |config|
+  # your config here
+end
+
+# Start reporter after initialization
+Rails.application.config.after_initialize do
+  Speedshop::Cloudwatch.start!
 end
 ```
 
@@ -196,16 +244,21 @@ end
 
 For Rack apps (Sinatra, etc.):
 
-- Insert `Speedshop::Cloudwatch::RackMiddleware` at the top of your middleware stack.
-- Configure collectors and start the reporter during app boot.
+- Require the integrations you need
+- Insert `Speedshop::Cloudwatch::RackMiddleware` at the top of your middleware stack
+- Configure collectors and start the reporter during app boot
 
 Example config:
 
 ```ruby
-require 'speedshop/cloudwatch'
+require 'speedshop/cloudwatch/core'
+require 'speedshop/cloudwatch/rack'
+
+# Insert middleware
+use Speedshop::Cloudwatch::RackMiddleware
 
 Speedshop::Cloudwatch.configure do |config|
-  # ...
+  # your config here
 end
 
 Speedshop::Cloudwatch.start!
@@ -214,9 +267,17 @@ Speedshop::Cloudwatch.start!
 
 ### Disabling Integrations
 
-In general, the best way to disable an integration is to not enable it:
+The best way to disable an integration is to not require it:
 
-- **Puma:** Do not add `:puma` to `config.collectors`.
-- **Sidekiq:** Leave `config.metrics[:sidekiq]` empty (`[]`) to no-op even if the collector runs, or avoid running with Sidekiq server entirely.
-- **Rack (Rails):** Add `require: false` to your Gemfile and manually require/insert middleware only where desired.
-- **ActiveJob:** Do not include `Speedshop::Cloudwatch::ActiveJob` in your `ApplicationJob`.
+- **Puma:** Do not `require 'speedshop/cloudwatch/puma'` or add `:puma` to `config.collectors`.
+- **Sidekiq:** Do not `require 'speedshop/cloudwatch/sidekiq'`.
+- **Rack:** Do not `require 'speedshop/cloudwatch/rack'` or insert the middleware.
+- **ActiveJob:** Do not `require 'speedshop/cloudwatch/active_job'` or include the module in your jobs.
+
+You can also disable specific metrics by setting them to an empty array:
+
+```ruby
+Speedshop::Cloudwatch.configure do |config|
+  config.metrics[:rack] = []  # Disable all Rack metrics
+end
+```
