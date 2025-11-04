@@ -53,7 +53,15 @@ module Speedshop
           @thread = @pid = nil
           @collectors.clear
         end
-        thread_to_join&.join
+
+        return unless thread_to_join
+
+        result = thread_to_join.join(2)
+        if result.nil?
+          Speedshop::Cloudwatch.log_info("Reporter thread did not finish within 2s timeout")
+        else
+          Speedshop::Cloudwatch.log_info("Reporter thread stopped gracefully")
+        end
       end
 
       def report(metric:, value: nil, statistic_values: nil, dimensions: {}, namespace: nil, integration: nil)
@@ -127,6 +135,8 @@ module Speedshop
           collect_metrics
           flush_metrics
         end
+
+        flush_metrics
       rescue => e
         Speedshop::Cloudwatch.log_error("Reporter error: #{e.message}", e)
       end

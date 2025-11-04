@@ -31,6 +31,10 @@ module Speedshop
         reporter.start!
       end
 
+      def stop!
+        reporter.stop!
+      end
+
       def log_info(msg)
         Config.instance.logger.info "Speedshop::Cloudwatch: #{msg}"
       end
@@ -41,4 +45,8 @@ module Speedshop
       end
     end
   end
+end
+
+at_exit do
+  Speedshop::Cloudwatch.stop! if Speedshop::Cloudwatch.reporter.started?
 end
