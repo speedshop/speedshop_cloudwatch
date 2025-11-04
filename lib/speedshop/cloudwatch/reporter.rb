@@ -12,6 +12,7 @@ module Speedshop
 
       def initialize
         @mutex = Mutex.new
+        @condition_variable = ConditionVariable.new
         @queue = []
         @collectors = []
         @thread = nil
@@ -47,6 +48,7 @@ module Speedshop
           return unless @running
           Speedshop::Cloudwatch.log_info("Stopping metric reporter")
           @running = false
+          @condition_variable.signal
           thread_to_join = @thread
           @thread = @pid = nil
           @collectors.clear
@@ -118,9 +120,8 @@ module Speedshop
 
       def run_loop
         while @running
-          (config.interval / 0.1).to_i.times do
-            break unless @running
-            sleep 0.1
+          @mutex.synchronize do
+            @condition_variable.wait(@mutex, config.interval) if @running
           end
           break unless @running
           collect_metrics
