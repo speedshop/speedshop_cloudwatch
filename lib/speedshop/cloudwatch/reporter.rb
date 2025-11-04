@@ -52,8 +52,6 @@ module Speedshop
           @collectors.clear
         end
 
-        flush_metrics
-
         return unless thread_to_join
 
         result = thread_to_join.join(2)
@@ -136,6 +134,8 @@ module Speedshop
           collect_metrics
           flush_metrics
         end
+
+        flush_metrics
       rescue => e
         Speedshop::Cloudwatch.log_error("Reporter error: #{e.message}", e)
       end
