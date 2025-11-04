@@ -152,7 +152,13 @@ module Speedshop
       end
 
       def drain_queue
-        @mutex.synchronize { @queue.empty? ? nil : @queue.dup.tap { @queue.clear } }
+        buf = nil
+        @mutex.synchronize do
+          return nil if @queue.empty?
+          buf = @queue
+          @queue = []
+        end
+        buf
       end
 
       def process_namespace(namespace, ns_metrics, high_resolution)
