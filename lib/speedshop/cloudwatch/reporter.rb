@@ -122,7 +122,7 @@ module Speedshop
           @collectors << Speedshop::Cloudwatch::Puma::Collector.new if integration == :puma
           @collectors << Speedshop::Cloudwatch::Sidekiq::Collector.new if integration == :sidekiq
         rescue => e
-          Speedshop::Cloudwatch.log_error("Failed to initialize collector for #{integration.name}: #{e.message}", e)
+          Speedshop::Cloudwatch.log_error("Failed to initialize collector for #{integration}: #{e.message}", e)
         end
       end
 
