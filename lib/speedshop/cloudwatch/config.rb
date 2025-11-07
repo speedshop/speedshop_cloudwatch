@@ -9,16 +9,20 @@ module Speedshop
       include Singleton
 
       attr_accessor :interval, :metrics, :namespaces, :logger, :sidekiq_queues, :dimensions, :units, :collectors,
-        :enabled_environments, :environment, :client
+        :enabled_environments, :environment
       attr_writer :client
 
       def initialize
         reset
       end
 
+      def client
+        @client ||= Aws::CloudWatch::Client.new
+      end
+
       def reset
         @interval = 60
-        @client = Aws::CloudWatch::Client.new
+        @client = nil
         @metrics = {
           puma: [],
           sidekiq: [:QueueLatency],
