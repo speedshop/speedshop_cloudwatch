@@ -50,6 +50,7 @@ class ConfigTest < SpeedshopCloudwatchTest
   end
 
   def test_enabled_environments_defaults_to_production
+    @config.reset
     assert_equal ["production"], @config.enabled_environments
   end
 
