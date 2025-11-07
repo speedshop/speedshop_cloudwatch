@@ -9,7 +9,7 @@ module Speedshop
       include Singleton
 
       attr_accessor :interval, :metrics, :namespaces, :logger, :sidekiq_queues, :dimensions, :units, :collectors,
-                    :enabled_environments, :environment
+        :enabled_environments, :environment
       attr_writer :client
 
       def initialize
