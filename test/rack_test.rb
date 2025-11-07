@@ -2,8 +2,9 @@
 
 require "test_helper"
 require "rack"
+require "speedshop/cloudwatch/rack"
 
-class RackMiddlewareTest < SpeedshopCloudwatchTest
+class RackTest < SpeedshopCloudwatchTest
   def setup
     super
     @app = ->(env) { [200, {}, ["OK"]] }
@@ -25,7 +26,7 @@ class RackMiddlewareTest < SpeedshopCloudwatchTest
   end
 
   def call_middleware_with_header(header_name, queue_start_ms_ago: 100)
-    @middleware = Speedshop::Cloudwatch::RackMiddleware.new(@app)
+    @middleware = Speedshop::Cloudwatch::Rack.new(@app)
     queue_start = (Time.now.to_f * 1000) - queue_start_ms_ago
     env = {header_name => "t=#{queue_start}"}
     @middleware.call(env)
@@ -44,7 +45,7 @@ class RackMiddlewareTest < SpeedshopCloudwatchTest
   end
 
   def test_handles_missing_queue_header
-    @middleware = Speedshop::Cloudwatch::RackMiddleware.new(@app)
+    @middleware = Speedshop::Cloudwatch::Rack.new(@app)
 
     env = {}
     status, _headers, _body = @middleware.call(env)
@@ -83,7 +84,7 @@ class RackMiddlewareTest < SpeedshopCloudwatchTest
       config.logger = logger
     end
 
-    @middleware = Speedshop::Cloudwatch::RackMiddleware.new(@app)
+    @middleware = Speedshop::Cloudwatch::Rack.new(@app)
 
     reporter = Speedshop::Cloudwatch.reporter
     reporter.stub :report, ->(*) { raise "boom" } do
