@@ -167,4 +167,40 @@ class ReporterTest < SpeedshopCloudwatchTest
     @reporter.report(metric: :metric2, value: 2)
     assert @reporter.started?
   end
+
+  def test_does_not_start_in_disabled_environment
+    @config.enabled_environments = ["production"]
+    @config.environment = "development"
+
+    @reporter.start!
+
+    refute @reporter.started?
+  end
+
+  def test_starts_in_enabled_environment
+    @config.enabled_environments = ["production", "staging"]
+    @config.environment = "staging"
+
+    @reporter.start!
+
+    assert @reporter.started?
+  end
+
+  def test_does_not_start_on_report_in_disabled_environment
+    @config.enabled_environments = ["production"]
+    @config.environment = "test"
+
+    @reporter.report(metric: :test_metric, value: 42)
+
+    refute @reporter.started?
+  end
+
+  def test_starts_on_report_in_enabled_environment
+    @config.enabled_environments = ["development", "test"]
+    @config.environment = "test"
+
+    @reporter.report(metric: :test_metric, value: 42)
+
+    assert @reporter.started?
+  end
 end

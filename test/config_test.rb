@@ -48,4 +48,35 @@ class ConfigTest < SpeedshopCloudwatchTest
     @config.dimensions = {ServiceName: "myservice-api", Environment: "production"}
     assert_equal({ServiceName: "myservice-api", Environment: "production"}, @config.dimensions)
   end
+
+  def test_enabled_environments_defaults_to_production
+    assert_equal ["production"], @config.enabled_environments
+  end
+
+  def test_allows_setting_enabled_environments
+    @config.enabled_environments = ["production", "staging"]
+    assert_equal ["production", "staging"], @config.enabled_environments
+  end
+
+  def test_environment_defaults_to_rails_env
+    # The environment is set in detect_environment, which we test indirectly here
+    refute_nil @config.environment
+  end
+
+  def test_allows_setting_environment
+    @config.environment = "staging"
+    assert_equal "staging", @config.environment
+  end
+
+  def test_environment_enabled_returns_true_when_environment_is_enabled
+    @config.enabled_environments = ["production", "staging"]
+    @config.environment = "staging"
+    assert @config.environment_enabled?
+  end
+
+  def test_environment_enabled_returns_false_when_environment_is_not_enabled
+    @config.enabled_environments = ["production"]
+    @config.environment = "development"
+    refute @config.environment_enabled?
+  end
 end
