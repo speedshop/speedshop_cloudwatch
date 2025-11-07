@@ -193,6 +193,7 @@ class ReporterTest < SpeedshopCloudwatchTest
     @reporter.report(metric: :test_metric, value: 42)
 
     refute @reporter.started?
+    assert_empty @reporter.queue
   end
 
   def test_starts_on_report_in_enabled_environment

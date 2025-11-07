@@ -66,6 +66,8 @@ module Speedshop
       end
 
       def report(metric:, value: nil, statistic_values: nil, dimensions: {}, namespace: nil, integration: nil)
+        return unless config.environment_enabled?
+
         metric_name = metric.to_sym
 
         int = integration || find_integration_for_metric(metric_name)
