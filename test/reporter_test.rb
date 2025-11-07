@@ -204,4 +204,68 @@ class ReporterTest < SpeedshopCloudwatchTest
 
     assert @reporter.started?
   end
+
+  def test_queue_respects_max_size
+    @config.queue_max_size = 5
+
+    6.times { |i| @reporter.report(metric: :test_metric, value: i) }
+
+    assert_equal 5, @reporter.queue.size
+  end
+
+  def test_queue_drops_oldest_metrics_on_overflow
+    @config.queue_max_size = 3
+
+    @reporter.report(metric: :test_metric, value: 1)
+    @reporter.report(metric: :test_metric, value: 2)
+    @reporter.report(metric: :test_metric, value: 3)
+    @reporter.report(metric: :test_metric, value: 4)
+
+    queue = @reporter.queue
+    assert_equal 3, queue.size
+    assert_equal 2.0, queue[0][:value]
+    assert_equal 3.0, queue[1][:value]
+    assert_equal 4.0, queue[2][:value]
+  end
+
+  def test_queue_clearing_on_fork_detection
+    @reporter.queue << {metric_name: "test_metric", value: 1}
+    @reporter.queue << {metric_name: "test_metric", value: 2}
+    assert_equal 2, @reporter.queue.size
+
+    @reporter.pid = 99999
+
+    @reporter.start!
+
+    assert_empty @reporter.queue
+  end
+
+  def test_overflow_logging_is_throttled
+    @config.queue_max_size = 2
+    log_output = StringIO.new
+    @config.logger = Logger.new(log_output)
+
+    5.times { |i| @reporter.report(metric: :test_metric, value: i) }
+
+    @reporter.send(:log_overflow_if_needed)
+
+    log_content = log_output.string
+    assert_match(/dropped 3 oldest metric/, log_content)
+    assert_match(/max queue size: 2/, log_content)
+  end
+
+  def test_overflow_counter_resets_after_logging
+    @config.queue_max_size = 2
+    @config.logger = Logger.new(nil)
+
+    5.times { |i| @reporter.report(metric: :test_metric, value: i) }
+    @reporter.send(:log_overflow_if_needed)
+
+    log_output = StringIO.new
+    @config.logger = Logger.new(log_output)
+
+    @reporter.send(:log_overflow_if_needed)
+
+    assert_empty log_output.string
+  end
 end
