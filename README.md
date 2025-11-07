@@ -45,6 +45,19 @@ See each integration below for instructions on how to setup and configure that i
 
 You'll need to [configure your CloudWatch API credentials](https://github.com/aws/aws-sdk-ruby?tab=readme-ov-file#configuration), which is usually done via ENV var.
 
+### Environment Control
+
+**By default, the reporter only runs in production.** The environment is detected from `RAILS_ENV`, `RACK_ENV`, or defaults to `"development"`.
+
+```ruby
+Speedshop::Cloudwatch.configure do |config|
+  config.enabled_environments = ["production", "staging"]
+  config.environment = "staging" # optional override
+end
+```
+
+### General Configuration
+
 You can configure which metrics are reported, the CloudWatch namespace for each integration, and other settings:
 
 ```ruby

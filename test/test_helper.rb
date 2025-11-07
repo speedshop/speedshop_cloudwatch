@@ -14,6 +14,9 @@ class SpeedshopCloudwatchTest < Minitest::Test
       config.client = Aws::CloudWatch::Client.new(region: "us-east-1", stub_responses: true)
       config.interval = 0.1
       config.logger = Logger.new(nil)
+      # Enable the reporter in test environment by default
+      config.environment = "test"
+      config.enabled_environments = ["test"]
     end
   end
 
