@@ -65,6 +65,14 @@ class SidekiqTest < SpeedshopCloudwatchTest
   end
 
   def test_collects_all_metrics_with_real_sidekiq_data
+    Speedshop::Cloudwatch.configure do |config|
+      config.metrics[:sidekiq] = [
+        :EnqueuedJobs, :ProcessedJobs, :FailedJobs, :ScheduledJobs, :RetryJobs,
+        :DeadJobs, :Workers, :Processes, :DefaultQueueLatency, :Capacity,
+        :Utilization, :QueueLatency, :QueueSize
+      ]
+    end
+
     reporter = Speedshop::Cloudwatch.reporter
     collector = Speedshop::Cloudwatch::Sidekiq.new
     collector.collect
