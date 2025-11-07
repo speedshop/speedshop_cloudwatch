@@ -2,6 +2,7 @@
 
 require "test_helper"
 require "puma"
+require "speedshop/cloudwatch/puma"
 
 class PumaTest < SpeedshopCloudwatchTest
   def test_collects_metrics_with_single_mode_stats
@@ -39,7 +40,7 @@ class PumaTest < SpeedshopCloudwatchTest
 
   def run_puma_collector_with_stats(stats)
     ::Puma.stub(:stats_hash, stats) do
-      collector = Speedshop::Cloudwatch::Puma::Collector.new
+      collector = Speedshop::Cloudwatch::Puma.new
       collector.collect
     end
     Speedshop::Cloudwatch.reporter.queue.dup

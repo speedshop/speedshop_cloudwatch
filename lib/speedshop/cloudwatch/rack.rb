@@ -2,7 +2,7 @@
 
 module Speedshop
   module Cloudwatch
-    class RackMiddleware
+    class Rack
       def initialize(app)
         @app = app
       end

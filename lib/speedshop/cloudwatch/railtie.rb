@@ -5,7 +5,7 @@ module Speedshop
     class Railtie < ::Rails::Railtie
       initializer "speedshop.cloudwatch.insert_middleware", before: :build_middleware_stack do |app|
         unless caller.any? { |c| c.include?("console_command.rb") || c.include?("runner_command.rb") } || self.class.in_rake_task?
-          app.config.middleware.insert_before 0, Speedshop::Cloudwatch::RackMiddleware
+          app.config.middleware.insert_before 0, Speedshop::Cloudwatch::Rack
         end
       end
 

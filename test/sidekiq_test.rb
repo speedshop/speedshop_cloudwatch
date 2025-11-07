@@ -1,9 +1,10 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "connection_pool"
 require "sidekiq"
 require "sidekiq/api"
-require "connection_pool"
+require "speedshop/cloudwatch/sidekiq"
 
 class SidekiqTest < SpeedshopCloudwatchTest
   class TestJob
@@ -65,7 +66,7 @@ class SidekiqTest < SpeedshopCloudwatchTest
 
   def test_collects_all_metrics_with_real_sidekiq_data
     reporter = Speedshop::Cloudwatch.reporter
-    collector = Speedshop::Cloudwatch::Sidekiq::Collector.new
+    collector = Speedshop::Cloudwatch::Sidekiq.new
     collector.collect
 
     metric_names = reporter.queue.map { |m| m[:metric_name] }
@@ -89,7 +90,7 @@ class SidekiqTest < SpeedshopCloudwatchTest
     end
 
     ::Sidekiq::Stats.stub(:new, -> { raise "boom" }) do
-      collector = Speedshop::Cloudwatch::Sidekiq::Collector.new
+      collector = Speedshop::Cloudwatch::Sidekiq.new
       collector.collect
     end
 
@@ -106,7 +107,7 @@ class SidekiqTest < SpeedshopCloudwatchTest
 
   def collect_sidekiq_queue_names
     reporter = Speedshop::Cloudwatch.reporter
-    collector = Speedshop::Cloudwatch::Sidekiq::Collector.new
+    collector = Speedshop::Cloudwatch::Sidekiq.new
     collector.collect
 
     queue_metrics = reporter.queue.select do |m|

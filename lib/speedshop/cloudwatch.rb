@@ -3,10 +3,6 @@
 require "aws-sdk-cloudwatch"
 require "speedshop/cloudwatch/config"
 require "speedshop/cloudwatch/reporter"
-require "speedshop/cloudwatch/active_job"
-require "speedshop/cloudwatch/puma"
-require "speedshop/cloudwatch/rack_middleware"
-require "speedshop/cloudwatch/sidekiq"
 require "speedshop/cloudwatch/version"
 
 module Speedshop
