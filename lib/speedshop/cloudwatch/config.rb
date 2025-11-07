@@ -8,8 +8,8 @@ module Speedshop
     class Config
       include Singleton
 
-      attr_accessor :interval, :metrics, :namespaces, :logger, :sidekiq_queues, :dimensions, :units, :collectors,
-        :enabled_environments, :environment
+      attr_accessor :interval, :metrics, :namespaces, :logger, :queue_max_size, :sidekiq_queues, :dimensions, :units,
+        :collectors, :enabled_environments, :environment
       attr_writer :client
 
       def initialize
@@ -22,6 +22,7 @@ module Speedshop
 
       def reset
         @interval = 60
+        @queue_max_size = 1000
         @client = nil
         @metrics = {
           puma: [],

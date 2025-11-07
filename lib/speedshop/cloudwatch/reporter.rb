@@ -18,6 +18,8 @@ module Speedshop
         @thread = nil
         @pid = Process.pid
         @running = false
+        @dropped_since_last_flush = 0
+        @last_overflow_log = nil
       end
 
       def start!
@@ -28,7 +30,10 @@ module Speedshop
           return if started?
 
           initialize_collectors
-          @collectors.clear if forked? # We only collect in the master process
+          if forked?
+            @collectors.clear
+            @queue.clear
+          end
 
           Speedshop::Cloudwatch.log_info("Starting metric reporter (collectors: #{@collectors.map(&:class).join(", ")})")
           @running = true
@@ -89,7 +94,13 @@ module Speedshop
           datum[:value] = value
         end
 
-        @mutex.synchronize { @queue << datum }
+        @mutex.synchronize do
+          if @queue.size >= config.queue_max_size
+            @queue.shift
+            @dropped_since_last_flush += 1
+          end
+          @queue << datum
+        end
 
         start! unless started?
       end
@@ -154,6 +165,7 @@ module Speedshop
 
       def flush_metrics
         metrics = drain_queue
+        log_overflow_if_needed
         return unless metrics
 
         high_resolution = config.interval.to_i < 60
@@ -280,6 +292,17 @@ module Speedshop
 
       def find_integration_for_metric(metric_name)
         config.metrics.find { |int, metrics| metrics.include?(metric_name.to_sym) }&.first
+      end
+
+      def log_overflow_if_needed
+        dropped = nil
+        @mutex.synchronize do
+          dropped = @dropped_since_last_flush
+          @dropped_since_last_flush = 0
+        end
+        return unless dropped > 0
+
+        Speedshop::Cloudwatch.log_error("Queue overflow: dropped #{dropped} oldest metric(s) (max queue size: #{config.queue_max_size})")
       end
     end
   end
