@@ -6,17 +6,13 @@ module Speedshop
   module Cloudwatch
     module Sidekiq
       class Collector
-        def initialize
-          @process_metrics = true
-        end
-
         def collect
           stats = ::Sidekiq::Stats.new
           processes = ::Sidekiq::ProcessSet.new.to_a
 
           report_stats(stats)
           report_utilization(processes)
-          report_process_metrics(processes) if @process_metrics
+          report_process_metrics(processes)
           report_queue_metrics
         rescue => e
           Speedshop::Cloudwatch.log_error("Failed to collect Sidekiq metrics: #{e.message}", e)

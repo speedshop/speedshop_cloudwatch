@@ -31,4 +31,16 @@ Speedshop::Cloudwatch.configure do |config|
   )
   config.interval = 15
   config.logger = Rails.logger
+
+  # Enable all metrics for smoketest
+  config.metrics[:puma] = [
+    :Workers, :BootedWorkers, :OldWorkers, :Running, :Backlog, :PoolCapacity, :MaxThreads
+  ]
+  config.metrics[:sidekiq] = [
+    :EnqueuedJobs, :ProcessedJobs, :FailedJobs, :ScheduledJobs, :RetryJobs,
+    :DeadJobs, :Workers, :Processes, :DefaultQueueLatency, :Capacity,
+    :Utilization, :QueueLatency, :QueueSize
+  ]
+  config.metrics[:rack] = [:RequestQueueTime]
+  config.metrics[:active_job] = [:QueueLatency]
 end

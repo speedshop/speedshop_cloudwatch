@@ -10,25 +10,35 @@ This library supports **Ruby 2.7+, Sidekiq 7+, and Puma 6+**.
 
 ## Metrics
 
-If not configured, all metrics are enabled by default.
+By default, only essential queue metrics are enabled. Puma metrics are disabled by default, and Sidekiq reports only `QueueLatency`.
 
 For a full explanation of every metric, [read our docs.](./docs/metrics.md)
 
 ```ruby
 # Defaults. Copy and modify this list to customize.
+config.metrics[:puma] = []  # Disabled by default
+
+config.metrics[:sidekiq] = [:QueueLatency]  # Only queue latency by default
+
+config.metrics[:rack] = [:RequestQueueTime]
+
+config.metrics[:active_job] = [:QueueLatency]
+```
+
+To enable additional metrics, configure them explicitly:
+
+```ruby
+# Enable all Puma metrics
 config.metrics[:puma] = [
   :Workers, :BootedWorkers, :OldWorkers, :Running, :Backlog, :PoolCapacity, :MaxThreads
 ]
 
+# Enable additional Sidekiq metrics
 config.metrics[:sidekiq] = [
   :EnqueuedJobs, :ProcessedJobs, :FailedJobs, :ScheduledJobs, :RetryJobs,
   :DeadJobs, :Workers, :Processes, :DefaultQueueLatency, :Capacity,
   :Utilization, :QueueLatency, :QueueSize
 ]
-
-config.metrics[:rack] = [:RequestQueueTime]
-
-config.metrics[:active_job] = [:QueueLatency]
 ```
 
 This gem is for **infrastructure and queue metrics**, not application performance metrics, like response times, job execution times, or error rates. Use your APM for that stuff.
@@ -56,7 +66,9 @@ Speedshop::Cloudwatch.configure do |config|
   config.logger = Logger.new(Rails.root.join("log", "cloudwatch.log"))
 
   # Customize which metrics to report (whitelist)
+  # Puma metrics are disabled by default, enable them explicitly:
   config.metrics[:puma] = [:Workers, :BootedWorkers, :Running, :Backlog]
+  # Sidekiq defaults to [:QueueLatency], add more as needed:
   config.metrics[:sidekiq] = [:EnqueuedJobs, :QueueLatency, :QueueSize]
 
   # Customize which Sidekiq queues to monitor (all queues by default)
@@ -82,6 +94,10 @@ require_relative "../config/environment"
 
 Speedshop::Cloudwatch.configure do |config|
   config.collectors << :puma
+  # Enable Puma metrics (disabled by default)
+  config.metrics[:puma] = [
+    :Workers, :BootedWorkers, :OldWorkers, :Running, :Backlog, :PoolCapacity, :MaxThreads
+  ]
 end
 
 # Start the reporter so Puma metrics are collected
@@ -89,6 +105,8 @@ Speedshop::Cloudwatch.start!
 ```
 
 Collection runs in the master process and reports per-worker metrics (see below). This works correctly with both `preload_app true` and `false`, as well as single and cluster modes.
+
+**Note:** Puma metrics are disabled by default. You must explicitly enable them in your configuration.
 
 This reports the following metrics:
 
@@ -123,6 +141,18 @@ RequestQueueTime - Time spent waiting in the request queue (Milliseconds)
 In Sidekiq server processes, this integration auto-registers lifecycle hooks. On startup, it adds the `:sidekiq` collector and starts the reporter (leader-only when using Sidekiq Enterprise).
 
 If you're using Sidekiq as your ActiveJob adapter, prefer this integration instead of the ActiveJob integration.
+
+By default, only `QueueLatency` is reported. To enable additional metrics, configure them explicitly:
+
+```ruby
+Speedshop::Cloudwatch.configure do |config|
+  config.metrics[:sidekiq] = [
+    :EnqueuedJobs, :ProcessedJobs, :FailedJobs, :ScheduledJobs, :RetryJobs,
+    :DeadJobs, :Workers, :Processes, :DefaultQueueLatency, :Capacity,
+    :Utilization, :QueueLatency, :QueueSize
+  ]
+end
+```
 
 We report the following metrics:
 
