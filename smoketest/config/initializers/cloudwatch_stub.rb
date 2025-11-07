@@ -31,4 +31,5 @@ Speedshop::Cloudwatch.configure do |config|
   )
   config.interval = 15
   config.logger = Rails.logger
+  config.environment = "production"
 end
