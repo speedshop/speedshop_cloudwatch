@@ -6,6 +6,10 @@ require "speedshop/cloudwatch/puma"
 
 class PumaTest < SpeedshopCloudwatchTest
   def test_collects_metrics_with_single_mode_stats
+    Speedshop::Cloudwatch.configure do |config|
+      config.metrics[:puma] = [:Running, :Backlog, :PoolCapacity, :MaxThreads]
+    end
+
     stub_puma_stats = {
       workers: 0,
       booted_workers: 0,
@@ -29,6 +33,12 @@ class PumaTest < SpeedshopCloudwatchTest
   end
 
   def test_collects_metrics_with_clustered_mode_stats
+    Speedshop::Cloudwatch.configure do |config|
+      config.metrics[:puma] = [
+        :Workers, :BootedWorkers, :OldWorkers, :Running, :Backlog, :PoolCapacity, :MaxThreads
+      ]
+    end
+
     metrics = collect_clustered_puma_metrics
 
     assert_collects_cluster_level_metrics(metrics)
@@ -91,6 +101,7 @@ class PumaTest < SpeedshopCloudwatchTest
   def test_uses_configured_namespace
     Speedshop::Cloudwatch.configure do |config|
       config.namespaces[:puma] = "MyApp/Puma"
+      config.metrics[:puma] = [:Workers, :BootedWorkers, :OldWorkers, :Running, :Backlog, :PoolCapacity, :MaxThreads]
     end
 
     stub_puma_stats = {workers: 1, booted_workers: 1, old_workers: 0, running: 5, backlog: 0, pool_capacity: 5, max_threads: 5}
