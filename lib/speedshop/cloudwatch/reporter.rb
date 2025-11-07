@@ -22,6 +22,7 @@ module Speedshop
 
       def start!
         return if started?
+        return unless config.environment_enabled?
 
         @mutex.synchronize do
           return if started?

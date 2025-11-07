@@ -43,4 +43,6 @@ Speedshop::Cloudwatch.configure do |config|
   ]
   config.metrics[:rack] = [:RequestQueueTime]
   config.metrics[:active_job] = [:QueueLatency]
+  
+  config.environment = "production"
 end

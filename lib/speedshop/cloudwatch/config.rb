@@ -8,7 +8,8 @@ module Speedshop
     class Config
       include Singleton
 
-      attr_accessor :interval, :metrics, :namespaces, :logger, :sidekiq_queues, :dimensions, :units, :collectors
+      attr_accessor :interval, :metrics, :namespaces, :logger, :sidekiq_queues, :dimensions, :units, :collectors,
+        :enabled_environments, :environment
       attr_writer :client
 
       def initialize
@@ -43,6 +44,12 @@ module Speedshop
         @dimensions = {}
         @logger = (defined?(Rails) && Rails.respond_to?(:logger) && Rails.logger) ? Rails.logger : Logger.new($stdout)
         @collectors = [] # [:puma, :sidekiq]
+        @enabled_environments = ["production"]
+        @environment = detect_environment
+      end
+
+      def environment_enabled?
+        enabled_environments.include?(environment)
       end
 
       def self.reset
@@ -51,6 +58,12 @@ module Speedshop
           config&.reset
         end
         instance_variable_set(:@singleton__instance__, nil)
+      end
+
+      private
+
+      def detect_environment
+        ENV.fetch("RAILS_ENV", ENV.fetch("RACK_ENV", "development"))
       end
     end
   end
