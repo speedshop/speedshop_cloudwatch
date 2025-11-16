@@ -19,9 +19,9 @@ Gem::Specification.new do |spec|
   spec.metadata["source_code_uri"] = "https://github.com/nateberkopec/speedshop-cloudwatch"
 
   spec.files = IO.popen(%w[git ls-files -z], chdir: __dir__, err: IO::NULL) do |ls|
-    ls.readlines("\x0", chomp: true).reject do |f|
-      (f == __FILE__) ||
-        f.start_with?(*%w[bin/ Gemfile .gitignore .github/ .standard.yml])
+    ls.readlines("\x0", chomp: true).select do |path|
+      path.start_with?("lib/", "bin/", "docs/") ||
+        %w[README.md LICENSE.txt speedshop-cloudwatch.gemspec Rakefile].include?(path)
     end
   end
   spec.require_paths = ["lib"]
