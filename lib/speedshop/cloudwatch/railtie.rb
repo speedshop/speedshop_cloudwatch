@@ -11,8 +11,8 @@ module Speedshop
 
       def self.in_rake_task?
         return false unless defined?(::Rake) && ::Rake.respond_to?(:application)
-        tasks = ::Rake.application.top_level_tasks || []
-        tasks.any? { |t| t.match?(/^(assets:|db:|webpacker:)/) }
+        tasks = ::Rake.application&.top_level_tasks
+        tasks&.any? || false
       end
     end
   end
