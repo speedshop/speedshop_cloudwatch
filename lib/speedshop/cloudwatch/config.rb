@@ -21,32 +21,11 @@ module Speedshop
       end
 
       def reset
-        @interval = 60
-        @queue_max_size = 1000
-        @client = nil
-        @metrics = {
-          puma: [],
-          sidekiq: [:QueueLatency],
-          rack: [:RequestQueueTime],
-          active_job: [:QueueLatency]
-        }
-        @units = {
-          Workers: "Count", BootedWorkers: "Count", OldWorkers: "Count", Running: "Count",
-          Backlog: "Count", PoolCapacity: "Count", MaxThreads: "Count",
-          EnqueuedJobs: "Count", ProcessedJobs: "Count", FailedJobs: "Count",
-          ScheduledJobs: "Count", RetryJobs: "Count", DeadJobs: "Count",
-          Processes: "Count", Capacity: "Count", QueueSize: "Count",
-          DefaultQueueLatency: "Seconds", QueueLatency: "Seconds",
-          Utilization: "Percent",
-          RequestQueueTime: "Milliseconds"
-        }
-        @namespaces = {puma: "Puma", sidekiq: "Sidekiq", rack: "Rack", active_job: "ActiveJob"}
-        @sidekiq_queues = nil
-        @dimensions = {}
-        @logger = (defined?(Rails) && Rails.respond_to?(:logger) && Rails.logger) ? Rails.logger : Logger.new($stdout)
-        @collectors = [] # [:puma, :sidekiq]
-        @enabled_environments = ["production"]
-        @environment = detect_environment
+        reset_basic_config
+        reset_metrics_config
+        reset_units
+        reset_namespaces
+        reset_advanced_config
       end
 
       def environment_enabled?
@@ -62,6 +41,67 @@ module Speedshop
       end
 
       private
+
+      def reset_basic_config
+        @interval = 60
+        @queue_max_size = 1000
+        @client = nil
+      end
+
+      def reset_metrics_config
+        @metrics = {
+          puma: [], sidekiq: [:QueueLatency],
+          rack: [:RequestQueueTime], active_job: [:QueueLatency]
+        }
+      end
+
+      def reset_units
+        @units = default_units
+      end
+
+      def default_units
+        count_units.merge(time_units).merge(Utilization: "Percent")
+      end
+
+      def count_units
+        {
+          Workers: "Count", BootedWorkers: "Count", OldWorkers: "Count",
+          Running: "Count", Backlog: "Count", PoolCapacity: "Count",
+          MaxThreads: "Count", EnqueuedJobs: "Count", ProcessedJobs: "Count",
+          FailedJobs: "Count", ScheduledJobs: "Count", RetryJobs: "Count",
+          DeadJobs: "Count", Processes: "Count", Capacity: "Count",
+          QueueSize: "Count"
+        }
+      end
+
+      def time_units
+        {
+          DefaultQueueLatency: "Seconds",
+          QueueLatency: "Seconds",
+          RequestQueueTime: "Milliseconds"
+        }
+      end
+
+      def reset_namespaces
+        @namespaces = {
+          puma: "Puma", sidekiq: "Sidekiq",
+          rack: "Rack", active_job: "ActiveJob"
+        }
+      end
+
+      def reset_advanced_config
+        @sidekiq_queues = nil
+        @dimensions = {}
+        @logger = default_logger
+        @collectors = []
+        @enabled_environments = ["production"]
+        @environment = detect_environment
+      end
+
+      def default_logger
+        (defined?(Rails) && Rails.respond_to?(:logger) && Rails.logger) ||
+          Logger.new($stdout)
+      end
 
       def detect_environment
         ENV.fetch("RAILS_ENV", ENV.fetch("RACK_ENV", "development"))

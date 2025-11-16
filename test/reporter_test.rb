@@ -248,7 +248,7 @@ class ReporterTest < SpeedshopCloudwatchTest
 
     5.times { |i| @reporter.report(metric: :test_metric, value: i) }
 
-    @reporter.send(:log_overflow_if_needed)
+    @reporter.send(:log_overflow)
 
     log_content = log_output.string
     assert_match(/dropped 3 oldest metric/, log_content)
@@ -260,12 +260,12 @@ class ReporterTest < SpeedshopCloudwatchTest
     @config.logger = Logger.new(nil)
 
     5.times { |i| @reporter.report(metric: :test_metric, value: i) }
-    @reporter.send(:log_overflow_if_needed)
+    @reporter.send(:log_overflow)
 
     log_output = StringIO.new
     @config.logger = Logger.new(log_output)
 
-    @reporter.send(:log_overflow_if_needed)
+    @reporter.send(:log_overflow)
 
     assert_empty log_output.string
   end

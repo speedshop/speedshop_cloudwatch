@@ -8,16 +8,29 @@ module Speedshop
       end
 
       def report_job_metrics
-        begin
-          if enqueued_at
-            queue_time = Time.now.to_f - enqueued_at.to_f
-            # Drop JobClass to reduce time series cardinality and allow aggregation into StatisticSets per queue
-            Reporter.instance.report(metric: :QueueLatency, value: queue_time, dimensions: {QueueName: queue_name}, integration: :active_job)
-          end
-        rescue => e
-          Speedshop::Cloudwatch.log_error("Failed to collect ActiveJob metrics: #{e.message}", e)
-        end
+        safe_report_latency
         yield
+      end
+
+      private
+
+      def safe_report_latency
+        report_latency if enqueued_at
+      rescue => e
+        Speedshop::Cloudwatch.log_error("Failed to collect ActiveJob metrics: #{e.message}", e)
+      end
+
+      def report_latency
+        Reporter.instance.report(
+          metric: :QueueLatency,
+          value: calculate_latency,
+          dimensions: {QueueName: queue_name},
+          integration: :active_job
+        )
+      end
+
+      def calculate_latency
+        Time.now.to_f - enqueued_at.to_f
       end
     end
   end
