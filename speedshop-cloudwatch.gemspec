@@ -20,7 +20,7 @@ Gem::Specification.new do |spec|
 
   spec.files = IO.popen(%w[git ls-files -z], chdir: __dir__, err: IO::NULL) do |ls|
     ls.readlines("\x0", chomp: true).select do |path|
-      path.start_with?("lib/") || path.start_with?("bin/") || path.start_with?("docs/") ||
+      path.start_with?("lib/", "bin/", "docs/") ||
         %w[README.md LICENSE.txt speedshop-cloudwatch.gemspec Rakefile].include?(path)
     end
   end
