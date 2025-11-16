@@ -76,8 +76,11 @@ class SidekiqTest < SpeedshopCloudwatchTest
     reporter = Speedshop::Cloudwatch.reporter
     collector = Speedshop::Cloudwatch::Sidekiq.new
     collector.collect
+    reporter.start!
+    reporter.flush_now!
 
-    metric_names = reporter.queue.map { |m| m[:metric_name] }
+    metrics = @test_client.find_metrics
+    metric_names = metrics.map { |m| m[:metric_name] }
     assert_includes metric_names, "EnqueuedJobs"
     assert_includes metric_names, "ProcessedJobs"
     assert_includes metric_names, "FailedJobs"
@@ -117,8 +120,11 @@ class SidekiqTest < SpeedshopCloudwatchTest
     reporter = Speedshop::Cloudwatch.reporter
     collector = Speedshop::Cloudwatch::Sidekiq.new
     collector.collect
+    reporter.start!
+    reporter.flush_now!
 
-    queue_metrics = reporter.queue.select do |m|
+    metrics = @test_client.find_metrics
+    queue_metrics = metrics.select do |m|
       m[:dimensions]&.any? { |d| d[:name] == "QueueName" }
     end
     queue_metrics.map { |m| m[:dimensions].find { |d| d[:name] == "QueueName" }[:value] }.uniq

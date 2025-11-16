@@ -29,12 +29,16 @@ class ActiveJobTest < SpeedshopCloudwatchTest
     job.enqueued_at = Time.now.to_f - 2.5
 
     reporter = Speedshop::Cloudwatch.reporter
-    initial_size = reporter.queue.size
+    initial_count = @test_client.metric_count
 
     job.perform_now
+    reporter.start!
+    reporter.flush_now!
 
-    assert_equal initial_size + 1, reporter.queue.size
-    reported = reporter.queue.last
+    assert_equal initial_count + 1, @test_client.metric_count
+    metrics = @test_client.find_metrics(metric_name: :QueueLatency)
+    assert_equal 1, metrics.size
+    reported = metrics.first
     assert_equal "QueueLatency", reported[:metric_name]
     assert_operator reported[:value], :>=, 2.5
     # Only QueueName is reported to reduce cardinality
@@ -47,11 +51,13 @@ class ActiveJobTest < SpeedshopCloudwatchTest
     job.enqueued_at = nil
 
     reporter = Speedshop::Cloudwatch.reporter
-    initial_size = reporter.queue.size
+    initial_count = @test_client.metric_count
 
     job.perform_now
+    reporter.start!
+    reporter.flush_now!
 
-    assert_equal initial_size, reporter.queue.size
+    assert_equal initial_count, @test_client.metric_count
   end
 
   def test_job_executes_successfully_even_if_reporting_fails
@@ -74,10 +80,13 @@ class ActiveJobTest < SpeedshopCloudwatchTest
 
     reporter = Speedshop::Cloudwatch.reporter
     job.perform_now
+    reporter.start!
+    reporter.flush_now!
 
-    reported = reporter.queue.last
+    metrics = @test_client.metrics_for_namespace("MyApp/Jobs")
+    assert_equal 1, metrics.size
+    reported = metrics.first
     assert_equal "QueueLatency", reported[:metric_name]
-    assert_equal "MyApp/Jobs", reported[:namespace]
   end
 
   def test_respects_active_job_metrics_whitelist
@@ -89,12 +98,13 @@ class ActiveJobTest < SpeedshopCloudwatchTest
     job.enqueued_at = Time.now.to_f - 1.0
 
     reporter = Speedshop::Cloudwatch.reporter
-    queue = reporter.queue
-    initial_size = queue.size
+    initial_count = @test_client.metric_count
 
     job.perform_now
+    reporter.start!
+    reporter.flush_now!
 
-    assert_equal initial_size, queue.size
+    assert_equal initial_count, @test_client.metric_count
   end
 
   def test_logs_error_when_collection_fails

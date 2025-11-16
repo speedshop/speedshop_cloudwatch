@@ -7,9 +7,6 @@ module Speedshop
     class Reporter
       include Singleton
 
-      attr_reader :queue, :running, :thread
-      attr_accessor :pid
-
       def initialize
         @mutex = Mutex.new
         @condition_variable = ConditionVariable.new
@@ -23,8 +20,7 @@ module Speedshop
       end
 
       def start!
-        return if started?
-        return unless config.environment_enabled?
+        return if !config.environment_enabled? || started?
 
         @mutex.synchronize do
           return if started?
@@ -39,6 +35,7 @@ module Speedshop
           @running = true
           @thread = Thread.new do
             Thread.current.thread_variable_set(:fork_safe, true)
+            Thread.current.name = "scw_reporter"
             run_loop
           end
         end
@@ -110,6 +107,25 @@ module Speedshop
           @queue.clear
           @collectors.clear
         end
+      end
+
+      # Force immediate metrics collection and flush (for testing)
+      # This bypasses the normal interval-based flushing
+      def flush_now!
+        return unless @running
+
+        collect_metrics
+        flush_metrics
+      end
+
+      # Test helper: Simulate fork by setting a different PID
+      def test_set_pid(pid)
+        @pid = pid
+      end
+
+      # Test helper: Get the reporter thread for testing
+      def test_get_thread
+        @thread
       end
 
       def self.reset

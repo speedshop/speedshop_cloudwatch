@@ -10,16 +10,6 @@ class PumaTest < SpeedshopCloudwatchTest
       config.metrics[:puma] = [:Running, :Backlog, :PoolCapacity, :MaxThreads]
     end
 
-    stub_puma_stats = {
-      workers: 0,
-      booted_workers: 0,
-      old_workers: 0,
-      running: 5,
-      backlog: 0,
-      pool_capacity: 5,
-      max_threads: 5
-    }
-
     metrics = run_puma_collector_with_stats(stub_puma_stats)
 
     metric_names = metrics.map { |m| m[:metric_name] }
@@ -53,7 +43,10 @@ class PumaTest < SpeedshopCloudwatchTest
       collector = Speedshop::Cloudwatch::Puma.new
       collector.collect
     end
-    Speedshop::Cloudwatch.reporter.queue.dup
+    reporter = Speedshop::Cloudwatch.reporter
+    reporter.start!
+    reporter.flush_now!
+    @test_client.find_metrics
   end
 
   def collect_clustered_puma_metrics
@@ -104,7 +97,6 @@ class PumaTest < SpeedshopCloudwatchTest
       config.metrics[:puma] = [:Workers, :BootedWorkers, :OldWorkers, :Running, :Backlog, :PoolCapacity, :MaxThreads]
     end
 
-    stub_puma_stats = {workers: 1, booted_workers: 1, old_workers: 0, running: 5, backlog: 0, pool_capacity: 5, max_threads: 5}
     metrics = run_puma_collector_with_stats(stub_puma_stats)
 
     assert metrics.all? { |m| m[:namespace] == "MyApp/Puma" }, "Expected all metrics to use 'MyApp/Puma' namespace"
@@ -120,5 +112,19 @@ class PumaTest < SpeedshopCloudwatchTest
     run_puma_collector_with_stats(-> { raise "boom" })
 
     assert logger.error_logged?("Failed to collect Puma metrics"), "Expected error to be logged"
+  end
+
+  private
+
+  def stub_puma_stats
+    {
+      workers: 0,
+      booted_workers: 0,
+      old_workers: 0,
+      running: 5,
+      backlog: 0,
+      pool_capacity: 5,
+      max_threads: 5
+    }
   end
 end

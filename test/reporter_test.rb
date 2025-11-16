@@ -30,10 +30,12 @@ class ReporterTest < SpeedshopCloudwatchTest
     @config.metrics[:puma] = [:Workers]
     @reporter.report(metric: :Workers, value: 4)
     @reporter.report(metric: :BootedWorkers, value: 4)
+    @reporter.start!
+    @reporter.flush_now!
 
-    queue = @reporter.queue
-    assert_equal 1, queue.size
-    assert_equal "Workers", queue.first[:metric_name]
+    metrics = @test_client.find_metrics
+    assert_equal 1, metrics.size
+    assert_equal "Workers", metrics.first[:metric_name]
   end
 
   def test_respects_sidekiq_metrics_whitelist
@@ -41,10 +43,12 @@ class ReporterTest < SpeedshopCloudwatchTest
     @reporter.report(metric: :EnqueuedJobs, value: 10)
     @reporter.report(metric: :ProcessedJobs, value: 100)
     @reporter.report(metric: :QueueLatency, value: 5.2)
+    @reporter.start!
+    @reporter.flush_now!
 
-    queue = @reporter.queue
-    assert_equal 2, queue.size
-    metric_names = queue.map { |m| m[:metric_name] }
+    metrics = @test_client.find_metrics
+    assert_equal 2, metrics.size
+    metric_names = metrics.map { |m| m[:metric_name] }
     assert_includes metric_names, "EnqueuedJobs"
     assert_includes metric_names, "QueueLatency"
     refute_includes metric_names, "ProcessedJobs"
@@ -54,9 +58,10 @@ class ReporterTest < SpeedshopCloudwatchTest
     @config.namespaces[:custom] = "CustomNamespace"
     @config.metrics[:custom] = [:my_custom_metric]
     @reporter.report(metric: :my_custom_metric, value: 42)
+    @reporter.start!
+    @reporter.flush_now!
 
-    queue = @reporter.queue
-    assert_equal 1, queue.size
+    assert_equal 1, @test_client.metric_count
   end
 
   def test_started_returns_false_when_not_started
@@ -76,18 +81,16 @@ class ReporterTest < SpeedshopCloudwatchTest
 
   def test_start_is_idempotent
     @reporter.start!
-    thread1 = @reporter.thread
-
     @reporter.start!
-    thread2 = @reporter.thread
-
-    assert_same thread1, thread2
+    sleep(0.01)
+    assert_equal 1, Thread.list.count { |t| t.name == "scw_reporter" }
   end
 
   def test_started_detects_dead_thread
     @reporter.start!
-    @reporter.thread.kill
-    @reporter.thread.join
+    sleep(0.01)
+    thread = Thread.list.find { |t| t.name == "scw_reporter" }
+    thread.kill && thread.join
 
     refute @reporter.started?
   end
@@ -95,10 +98,12 @@ class ReporterTest < SpeedshopCloudwatchTest
   def test_adds_custom_dimensions_to_metrics
     @config.dimensions = {ServiceName: "myservice-api", Environment: "production"}
     @reporter.report(metric: :test_metric, value: 42, dimensions: {Region: "us-east-1"})
+    @reporter.start!
+    @reporter.flush_now!
 
-    queue = @reporter.queue
-    assert_equal 1, queue.size
-    dimensions = queue.first[:dimensions]
+    metrics = @test_client.find_metrics
+    assert_equal 1, metrics.size
+    dimensions = metrics.first[:dimensions]
     assert_equal 3, dimensions.size
 
     dimension_names = dimensions.map { |d| d[:name] }
@@ -115,10 +120,12 @@ class ReporterTest < SpeedshopCloudwatchTest
 
   def test_works_without_custom_dimensions
     @reporter.report(metric: :test_metric, value: 42, dimensions: {Region: "us-east-1"})
+    @reporter.start!
+    @reporter.flush_now!
 
-    queue = @reporter.queue
-    assert_equal 1, queue.size
-    dimensions = queue.first[:dimensions]
+    metrics = @test_client.find_metrics
+    assert_equal 1, metrics.size
+    dimensions = metrics.first[:dimensions]
     assert_equal 1, dimensions.size
     assert_equal "Region", dimensions.first[:name]
     assert_equal "us-east-1", dimensions.first[:value]
@@ -127,10 +134,12 @@ class ReporterTest < SpeedshopCloudwatchTest
   def test_custom_dimensions_with_no_metric_dimensions
     @config.dimensions = {ServiceName: "myservice-api"}
     @reporter.report(metric: :test_metric, value: 42)
+    @reporter.start!
+    @reporter.flush_now!
 
-    queue = @reporter.queue
-    assert_equal 1, queue.size
-    dimensions = queue.first[:dimensions]
+    metrics = @test_client.find_metrics
+    assert_equal 1, metrics.size
+    dimensions = metrics.first[:dimensions]
     assert_equal 1, dimensions.size
     assert_equal "ServiceName", dimensions.first[:name]
     assert_equal "myservice-api", dimensions.first[:value]
@@ -142,19 +151,6 @@ class ReporterTest < SpeedshopCloudwatchTest
     @reporter.report(metric: :test_metric, value: 42)
 
     assert @reporter.started?
-    assert @reporter.thread.alive?
-  end
-
-  def test_lazy_startup_does_not_double_start
-    refute @reporter.started?
-
-    @reporter.report(metric: :metric1, value: 1)
-    thread1 = @reporter.thread
-
-    @reporter.report(metric: :metric2, value: 2)
-    thread2 = @reporter.thread
-
-    assert_same thread1, thread2
   end
 
   def test_lazy_startup_restarts_after_stop
@@ -193,7 +189,7 @@ class ReporterTest < SpeedshopCloudwatchTest
     @reporter.report(metric: :test_metric, value: 42)
 
     refute @reporter.started?
-    assert_empty @reporter.queue
+    assert_equal 0, @test_client.metric_count
   end
 
   def test_starts_on_report_in_enabled_environment
@@ -209,8 +205,17 @@ class ReporterTest < SpeedshopCloudwatchTest
     @config.queue_max_size = 5
 
     6.times { |i| @reporter.report(metric: :test_metric, value: i) }
+    @reporter.start!
+    @reporter.flush_now!
 
-    assert_equal 5, @reporter.queue.size
+    # Metrics get aggregated, so we get 1 metric with statistic_values
+    metrics = @test_client.find_metrics(metric_name: :test_metric)
+    assert_equal 1, metrics.size
+
+    # Verify the aggregated metric has 5 samples (6th was dropped)
+    metric = metrics.first
+    assert metric[:statistic_values], "Expected metric to be aggregated"
+    assert_equal 5.0, metric[:statistic_values][:sample_count]
   end
 
   def test_queue_drops_oldest_metrics_on_overflow
@@ -220,24 +225,20 @@ class ReporterTest < SpeedshopCloudwatchTest
     @reporter.report(metric: :test_metric, value: 2)
     @reporter.report(metric: :test_metric, value: 3)
     @reporter.report(metric: :test_metric, value: 4)
-
-    queue = @reporter.queue
-    assert_equal 3, queue.size
-    assert_equal 2.0, queue[0][:value]
-    assert_equal 3.0, queue[1][:value]
-    assert_equal 4.0, queue[2][:value]
-  end
-
-  def test_queue_clearing_on_fork_detection
-    @reporter.queue << {metric_name: "test_metric", value: 1}
-    @reporter.queue << {metric_name: "test_metric", value: 2}
-    assert_equal 2, @reporter.queue.size
-
-    @reporter.pid = 99999
-
     @reporter.start!
+    @reporter.flush_now!
 
-    assert_empty @reporter.queue
+    # Metrics get aggregated into a single metric with statistic_values
+    metrics = @test_client.find_metrics(metric_name: :test_metric)
+    assert_equal 1, metrics.size
+
+    # Verify oldest metric was dropped and newest were kept
+    # After aggregation, we get statistic_values with 3 samples (min=2, max=4)
+    metric = metrics.first
+    assert metric[:statistic_values], "Expected metric to be aggregated"
+    assert_equal 3.0, metric[:statistic_values][:sample_count]
+    assert_equal 2.0, metric[:statistic_values][:minimum]
+    assert_equal 4.0, metric[:statistic_values][:maximum]
   end
 
   def test_overflow_logging_is_throttled

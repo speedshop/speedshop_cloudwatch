@@ -44,5 +44,5 @@ module Speedshop
 end
 
 at_exit do
-  Speedshop::Cloudwatch.stop! if Speedshop::Cloudwatch.reporter.started?
+  Speedshop::Cloudwatch.stop!
 end
