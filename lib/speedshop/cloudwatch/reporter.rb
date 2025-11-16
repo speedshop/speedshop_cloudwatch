@@ -118,16 +118,6 @@ module Speedshop
         flush_metrics
       end
 
-      # Test helper: Simulate fork by setting a different PID
-      def test_set_pid(pid)
-        @pid = pid
-      end
-
-      # Test helper: Get the reporter thread for testing
-      def test_get_thread
-        @thread
-      end
-
       def self.reset
         if instance_variable_defined?(:@singleton__instance__)
           reporter = instance_variable_get(:@singleton__instance__)
