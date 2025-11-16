@@ -8,7 +8,7 @@ module Speedshop
     class Config
       include Singleton
 
-      attr_accessor :interval, :metrics, :namespaces, :logger, :queue_max_size, :sidekiq_queues, :dimensions, :units,
+      attr_accessor :interval, :metrics, :namespaces, :logger, :queue_max_size, :sidekiq_queues, :dimensions,
         :collectors, :enabled_environments, :environment
       attr_writer :client
 
@@ -29,16 +29,6 @@ module Speedshop
           sidekiq: [:QueueLatency],
           rack: [:RequestQueueTime],
           active_job: [:QueueLatency]
-        }
-        @units = {
-          Workers: "Count", BootedWorkers: "Count", OldWorkers: "Count", Running: "Count",
-          Backlog: "Count", PoolCapacity: "Count", MaxThreads: "Count",
-          EnqueuedJobs: "Count", ProcessedJobs: "Count", FailedJobs: "Count",
-          ScheduledJobs: "Count", RetryJobs: "Count", DeadJobs: "Count",
-          Processes: "Count", Capacity: "Count", QueueSize: "Count",
-          DefaultQueueLatency: "Seconds", QueueLatency: "Seconds",
-          Utilization: "Percent",
-          RequestQueueTime: "Milliseconds"
         }
         @namespaces = {puma: "Puma", sidekiq: "Sidekiq", rack: "Rack", active_job: "ActiveJob"}
         @sidekiq_queues = nil

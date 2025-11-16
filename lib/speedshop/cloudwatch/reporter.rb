@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "singleton"
+require_relative "metrics"
 
 module Speedshop
   module Cloudwatch
@@ -67,18 +68,17 @@ module Speedshop
         end
       end
 
-      def report(metric:, value: nil, statistic_values: nil, dimensions: {}, namespace: nil, integration: nil)
+      def report(metric:, value: nil, statistic_values: nil, dimensions: {}, integration: nil)
         return unless config.environment_enabled?
 
         metric_name = metric.to_sym
-
         int = integration || find_integration_for_metric(metric_name)
         return unless int
-
-        ns = namespace || config.namespaces[int]
-        unit = config.units[metric_name] || "None"
-
         return unless metric_allowed?(int, metric_name)
+
+        metric_object = METRICS[int]&.find { |m| m.name == metric_name }
+        ns = config.namespaces[int]
+        unit = metric_object&.unit || "None"
 
         dimensions_array = dimensions.map { |k, v| {name: k.to_s, value: v.to_s} }
         all_dimensions = dimensions_array + custom_dimensions

@@ -12,7 +12,7 @@ This library supports **Ruby 2.7+, Sidekiq 7+, and Puma 6+**.
 
 By default, only essential queue metrics are enabled. Puma metrics are disabled by default, and Sidekiq reports only `QueueLatency`.
 
-For a full explanation of every metric, [read our docs.](./docs/metrics.md)
+For a full explanation of every metric, [read about them in the code.](./lib/speedshop/cloudwatch/metrics.rb)
 
 ```ruby
 # Defaults. Copy and modify this list to customize.
