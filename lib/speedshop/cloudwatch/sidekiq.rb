@@ -87,7 +87,11 @@ module Speedshop
       def report_queue_metrics
         configured = Speedshop::Cloudwatch.config.sidekiq_queues
         all_queues = ::Sidekiq::Queue.all
-        queues = (configured.nil? || configured.empty?) ? all_queues : all_queues.select { |q| configured.include?(q.name) }
+
+        no_config = configured.nil? || configured.empty?
+        queues = all_queues if no_config
+        queues ||= all_queues.select { |q| configured.include?(q.name) }
+
         queues.each do |q|
           reporter.report(metric: :QueueLatency, value: q.latency, dimensions: {QueueName: q.name})
           reporter.report(metric: :QueueSize, value: q.size, dimensions: {QueueName: q.name})
