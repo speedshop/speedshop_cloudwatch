@@ -98,6 +98,9 @@ Speedshop::Cloudwatch.configure do |config|
 end
 ```
 
+> [!WARNING]
+> Setting `config.interval` to less than 60 seconds automatically enables [high-resolution storage](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/publishingMetrics.html#high-resolution-metrics) (1-second granularity) in CloudWatch, which incurs additional costs.
+
 ### Puma Integration
 
 Add to your `config/puma.rb`:
@@ -270,3 +273,11 @@ require 'speedshop/cloudwatch/active_job'
 require 'speedshop/cloudwatch/rack'
 # require 'speedshop/cloudwatch/sidekiq'
 ```
+
+## Bibliography
+
+This library was developed with reference to and inspiration from these excellent projects:
+
+- [sidekiq-cloudwatchmetrics](https://github.com/sj26/sidekiq-cloudwatchmetrics) - Sidekiq CloudWatch metrics integration (portions adapted, see lib/speedshop/cloudwatch/sidekiq.rb)
+- [puma-cloudwatch](https://github.com/boltops-tools/puma-cloudwatch) - Puma CloudWatch metrics reporter
+- [judoscale-ruby](https://github.com/judoscale/judoscale-ruby) - Autoscaling metrics collection patterns
