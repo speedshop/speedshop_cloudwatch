@@ -297,7 +297,7 @@ module Speedshop
       end
 
       def find_integration_for_metric(metric_name)
-        config.metrics.find { |int, metrics| metrics.include?(metric_name.to_sym) }&.first
+        METRICS.find { |int, metrics| metrics.any? { |m| m.name == metric_name } }&.first
       end
 
       def log_overflow_if_needed

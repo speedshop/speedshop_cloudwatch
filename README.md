@@ -189,7 +189,7 @@ QueueSize - Size of each queue (Count) [per queue]
 ```
 
 Metrics marked [per queue] include a QueueName dimension.
-Capacity and Utilization metrics may include Tag and/or Hostname dimensions.
+Utilization metrics include Tag and/or Hostname dimensions.
 
 ### ActiveJob integration
 
@@ -262,7 +262,7 @@ Speedshop::Cloudwatch.start!
 You can disable the auto-integration of Sidekiq and Puma by not requiring them:
 
 ```ruby
-gem 'speedshop_cloudwatch`, require: false
+gem 'speedshop-cloudwatch`, require: false
 ```
 
 ```ruby
