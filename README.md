@@ -1,5 +1,9 @@
 # Speedshop::Cloudwatch
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/146ce110-311a-4acb-8000-66cd098f8b45" alt="Sit around and watch the clouds all day...">
+</p>
+
 This gem helps integrate your Ruby application with AWS CloudWatch for the purposes of auto-scaling. There are integrations for **Puma**, **Rack**, **Sidekiq** and **ActiveJob**.
 
 This gem is for **infrastructure and queue metrics**, not application performance metrics, like response times, job execution times, or error rates. Use your APM for that stuff.
