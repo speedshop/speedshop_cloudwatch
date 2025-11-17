@@ -32,8 +32,7 @@ class PumaTest < SpeedshopCloudwatchTest
     metrics = collect_clustered_puma_metrics
 
     assert_collects_cluster_level_metrics(metrics)
-    assert_collects_worker_level_metrics(metrics)
-    assert_collects_metrics_for_all_workers(metrics)
+    assert_collects_aggregate_worker_metrics(metrics)
   end
 
   private
@@ -72,23 +71,22 @@ class PumaTest < SpeedshopCloudwatchTest
     assert_includes metric_names, "OldWorkers"
   end
 
-  def assert_collects_worker_level_metrics(metrics)
+  def assert_collects_aggregate_worker_metrics(metrics)
     metric_names = metrics.map { |m| m[:metric_name] }
     ["Running", "Backlog", "PoolCapacity", "MaxThreads"].each do |metric|
       assert_includes metric_names, metric
     end
 
+    # Verify that worker metrics are reported without WorkerIndex dimension
     running_metrics = metrics.select { |m| m[:metric_name] == "Running" && m[:dimensions]&.any? { |d| d[:name] == "WorkerIndex" } }
-    assert_equal 2, running_metrics.size
-  end
+    assert_equal 0, running_metrics.size, "Expected no Running metrics with WorkerIndex dimension"
 
-  def assert_collects_metrics_for_all_workers(metrics)
-    [0, 1].each do |worker_index|
-      worker_metrics = metrics.select do |m|
-        m[:dimensions]&.any? { |d| d[:name] == "WorkerIndex" && d[:value] == worker_index.to_s }
-      end
-      assert_operator worker_metrics.size, :>, 0
+    # Verify aggregate metrics exist (without dimensions or with only integration dimension)
+    aggregate_running = metrics.select do |m|
+      m[:metric_name] == "Running" &&
+      (m[:dimensions].nil? || m[:dimensions].empty? || m[:dimensions].none? { |d| d[:name] == "WorkerIndex" })
     end
+    assert_operator aggregate_running.size, :>, 0, "Expected at least one aggregate Running metric"
   end
 
   def test_uses_configured_namespace

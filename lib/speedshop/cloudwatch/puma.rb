@@ -12,26 +12,18 @@ module Speedshop
             Reporter.instance.report(metric: metric_name, value: stats[m] || 0)
           end
           report_aggregate_worker_stats(stats)
+        else
+          # Single mode - report worker stats without dimensions
+          %i[running backlog pool_capacity max_threads].each do |m|
+            metric_name = m.to_s.split("_").map(&:capitalize).join.to_sym
+            Reporter.instance.report(metric: metric_name, value: stats[m] || 0)
+          end
         end
-
-        workers = stats[:worker_status] ? worker_statuses(stats) : [[stats, 0]]
-        workers.each { |worker_stats, idx| report_worker(worker_stats, idx) }
       rescue => e
         Speedshop::Cloudwatch.log_error("Failed to collect Puma metrics: #{e.message}", e)
       end
 
       private
-
-      def worker_statuses(stats)
-        stats[:worker_status].map.with_index { |w, idx| [w[:last_status] || {}, idx] }
-      end
-
-      def report_worker(stats, idx)
-        %i[running backlog pool_capacity max_threads].each do |m|
-          metric_name = m.to_s.split("_").map(&:capitalize).join.to_sym
-          Reporter.instance.report(metric: metric_name, value: stats[m] || 0, dimensions: {WorkerIndex: idx.to_s})
-        end
-      end
 
       def report_aggregate_worker_stats(stats)
         statuses = stats[:worker_status].map { |w| w[:last_status] || {} }
