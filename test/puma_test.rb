@@ -84,7 +84,7 @@ class PumaTest < SpeedshopCloudwatchTest
     # Verify aggregate metrics exist (without dimensions or with only integration dimension)
     aggregate_running = metrics.select do |m|
       m[:metric_name] == "Running" &&
-      (m[:dimensions].nil? || m[:dimensions].empty? || m[:dimensions].none? { |d| d[:name] == "WorkerIndex" })
+        (m[:dimensions].nil? || m[:dimensions].empty? || m[:dimensions].none? { |d| d[:name] == "WorkerIndex" })
     end
     assert_operator aggregate_running.size, :>, 0, "Expected at least one aggregate Running metric"
   end

@@ -8,15 +8,13 @@ module Speedshop
 
         if stats[:worker_status]
           %i[workers booted_workers old_workers].each do |m|
-            metric_name = m.to_s.split("_").map(&:capitalize).join.to_sym
-            Reporter.instance.report(metric: metric_name, value: stats[m] || 0)
+            Reporter.instance.report(metric: metric_name_for(m), value: stats[m] || 0)
           end
           report_aggregate_worker_stats(stats)
         else
           # Single mode - report worker stats without dimensions
           %i[running backlog pool_capacity max_threads].each do |m|
-            metric_name = m.to_s.split("_").map(&:capitalize).join.to_sym
-            Reporter.instance.report(metric: metric_name, value: stats[m] || 0)
+            Reporter.instance.report(metric: metric_name_for(m), value: stats[m] || 0)
           end
         end
       rescue => e
@@ -38,9 +36,8 @@ module Speedshop
           minimum = values.min.to_f
           maximum = values.max.to_f
 
-          metric_name = m.to_s.split("_").map(&:capitalize).join.to_sym
           Reporter.instance.report(
-            metric: metric_name,
+            metric: metric_name_for(m),
             statistic_values: {
               sample_count: sample_count,
               sum: sum,
@@ -50,6 +47,10 @@ module Speedshop
             integration: :puma
           )
         end
+      end
+
+      def metric_name_for(symbol)
+        symbol.to_s.split("_").map(&:capitalize).join.to_sym
       end
     end
   end
