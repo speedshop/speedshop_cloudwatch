@@ -35,7 +35,6 @@ module Speedshop
 
         report_stats(stats)
         report_utilization(processes)
-        report_process_metrics(processes)
         report_queue_metrics
       rescue => e
         Speedshop::Cloudwatch.log_error("Failed to collect Sidekiq metrics: #{e.message}", e)
@@ -88,24 +87,6 @@ module Speedshop
 
         utilization = avg_utilization(processes) * 100.0
         reporter.report(metric: :Utilization, value: utilization) unless utilization.nan?
-
-        processes.group_by { |p| p["tag"] }.each do |tag, procs|
-          next unless tag
-          capacity = procs.sum { |p| p["concurrency"] }
-          reporter.report(metric: :Capacity, value: capacity, dimensions: {Tag: tag})
-          util = avg_utilization(procs) * 100.0
-          reporter.report(metric: :Utilization, value: util, dimensions: {Tag: tag}) unless util.nan?
-        end
-      end
-
-      def report_process_metrics(processes)
-        processes.each do |p|
-          next if p["concurrency"].zero?
-          util = p["busy"] / p["concurrency"].to_f * 100.0
-          dims = {Hostname: p["hostname"]}
-          dims[:Tag] = p["tag"] if p["tag"] && !p["tag"].to_s.empty?
-          reporter.report(metric: :Utilization, value: util, dimensions: dims)
-        end
       end
 
       def report_queue_metrics
