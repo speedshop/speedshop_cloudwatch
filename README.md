@@ -1,6 +1,8 @@
 # Speedshop::Cloudwatch
 
-This gem helps integrate your Ruby application with AWS CloudWatch. There are integrations for **Puma**, **Rack**, **Sidekiq** and **ActiveJob**.
+This gem helps integrate your Ruby application with AWS CloudWatch for the purposes of auto-scaling. There are integrations for **Puma**, **Rack**, **Sidekiq** and **ActiveJob**.
+
+This gem is for **infrastructure and queue metrics**, not application performance metrics, like response times, job execution times, or error rates. Use your APM for that stuff.
 
 CloudWatch is unusually difficult to integrate with properly in Ruby, because the AWS library makes a synchronous HTTP request to AWS every time you record a metric. This is unlike the statsd or UDP-based models used by Datadog or other providers, which return more-or-less-instantaneously and are a lot less dangerous to use. Naively implementing this stuff yourself, you could end up adding 20-50ms of delay to your jobs or responses!
 
@@ -10,25 +12,21 @@ This library supports **Ruby 2.7+, Sidekiq 7+, and Puma 6+**.
 
 ## Metrics
 
-By default, only essential queue metrics are enabled. Puma metrics are disabled by default, and Sidekiq reports only `QueueLatency`.
-
 For a full explanation of every metric, [read about them in the code.](./lib/speedshop/cloudwatch/metrics.rb)
 
+By default, only essential queue metrics are enabled:
+
 ```ruby
-# Defaults. Copy and modify this list to customize.
-config.metrics[:puma] = []  # Disabled by default
-
-config.metrics[:sidekiq] = [:QueueLatency]  # Only queue latency by default
-
+config.metrics[:puma] = [] # Disabled by default
+config.metrics[:sidekiq] = [:QueueLatency] # Per queue
 config.metrics[:rack] = [:RequestQueueTime]
-
-config.metrics[:active_job] = [:QueueLatency]
+config.metrics[:active_job] = [:QueueLatency] # Per queue
 ```
 
 To enable additional metrics, configure them explicitly:
 
 ```ruby
-# Enable all Puma metrics
+# Enable all Puma metrics. These are based on reading Puma.stats.
 config.metrics[:puma] = [
   :Workers, :BootedWorkers, :OldWorkers, :Running, :Backlog, :PoolCapacity, :MaxThreads
 ]
@@ -41,8 +39,6 @@ config.metrics[:sidekiq] = [
 ]
 ```
 
-This gem is for **infrastructure and queue metrics**, not application performance metrics, like response times, job execution times, or error rates. Use your APM for that stuff.
-
 ## Installation
 
 ```ruby
@@ -53,22 +49,7 @@ See each integration below for instructions on how to setup and configure that i
 
 ## Configuration
 
-You'll need to [configure your CloudWatch API credentials](https://github.com/aws/aws-sdk-ruby?tab=readme-ov-file#configuration), which is usually done via ENV var.
-
-### Environment Control
-
-**By default, the reporter only runs in production.** The environment is detected from `RAILS_ENV`, `RACK_ENV`, or defaults to `"development"`.
-
-```ruby
-Speedshop::Cloudwatch.configure do |config|
-  config.enabled_environments = ["production", "staging"]
-  config.environment = "staging" # optional override
-end
-```
-
-### General Configuration
-
-You can configure which metrics are reported, the CloudWatch namespace for each integration, and other settings:
+You'll need to [configure your CloudWatch API credentials](https://github.com/aws/aws-sdk-ruby?tab=readme-ov-file#configuration), which is usually done via ENV var. If you're using one of their supported auto-config methods, you're good to go. If you're not, you'll need to provide your own `Aws::Cloudwatch::Client` object to the config (see below).
 
 ```ruby
 Speedshop::Cloudwatch.configure do |config|
@@ -101,7 +82,20 @@ end
 > [!WARNING]
 > Setting `config.interval` to less than 60 seconds automatically enables [high-resolution storage](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/publishingMetrics.html#high-resolution-metrics) (1-second granularity) in CloudWatch, which incurs additional costs.
 
-### Puma Integration
+### Environment Control
+
+**By default, the reporter only runs in production.** The environment is detected from `RAILS_ENV`, `RACK_ENV`, and defaults to `"development"`.
+
+```ruby
+Speedshop::Cloudwatch.configure do |config|
+  config.enabled_environments = ["production", "staging"]
+  config.environment = "staging" # optional override
+end
+```
+
+## Puma
+
+Puma metrics are disabled by default. You must explicitly enable them in your configuration.
 
 Add to your `config/puma.rb`:
 
@@ -122,8 +116,6 @@ Speedshop::Cloudwatch.start!
 
 Collection runs in the master process and reports per-worker metrics (see below). This works correctly with both `preload_app true` and `false`, as well as single and cluster modes.
 
-**Note:** Puma metrics are disabled by default. You must explicitly enable them in your configuration.
-
 This reports the following metrics:
 
 ```
@@ -136,9 +128,7 @@ PoolCapacity - Current thread pool capacity (Count) [per worker]
 MaxThreads - Maximum number of threads configured (Count) [per worker]
 ```
 
-Metrics marked [per worker] include a WorkerIndex dimension.
-
-### Rack Integration
+## Rack
 
 If you're using Rails, we'll automatically insert the correct middleware into the stack.
 
@@ -191,9 +181,10 @@ QueueSize - Size of each queue (Count) [per queue]
 Metrics marked [per queue] include a QueueName dimension.
 Utilization metrics include Tag and/or Hostname dimensions.
 
-### ActiveJob integration
+## ActiveJob
 
-**Note: if you're using Sidekiq, just use that integration and do not include the ActiveJob module.**
+> [!WARNING]
+> If you're using Sidekiq, just use that integration and do not include the ActiveJob module.
 
 In your ApplicationJob:
 
@@ -209,11 +200,11 @@ QueueLatency - Time job spent waiting in queue before execution (Seconds)
 
 This metric includes QueueName dimension and is aggregated per interval using CloudWatch StatisticSets.
 
-### Rails
+## Rails
 
 When running in a Rails app we:
 
-1. Automatically insert the Rack middleware at index 0 (skipped for console, runner, and common `assets:`/`db:` rake tasks).
+1. Automatically insert the Rack middleware at index 0.
 2. Respect your configuration for enabled metrics and collectors. The reporter starts automatically the first time a metric is reported (e.g., via Rack middleware) or when you call `Speedshop::Cloudwatch.start!` yourself (e.g., in Puma or initializers).
 
 If you want full control over these behaviors, add `require: false` to your Gemfile:
@@ -238,7 +229,7 @@ Rails.application.configure do
 end
 ```
 
-### Non-Rails Apps
+## Non-Rails Apps
 
 For Rack apps (Sinatra, etc.):
 
@@ -257,12 +248,12 @@ end
 Speedshop::Cloudwatch.start!
 ```
 
-### Disabling Automatic Integration
+## Disabling Automatic Integration
 
 You can disable the auto-integration of Sidekiq and Puma by not requiring them:
 
 ```ruby
-gem 'speedshop-cloudwatch`, require: false
+gem 'speedshop-cloudwatch', require: false
 ```
 
 ```ruby
